@@ -1,0 +1,36 @@
+{
+  "name": "affect",
+  "version": "0.1.0",
+  "description": "Affect is a micro abstraction layer for Javascript that simplifies unit testing and monitoring side-effects",
+  "main": "index.js",
+  "engineStrict": true,
+  "engines:": {
+    "node": ">=6.0.0"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/jlmessenger/affect.git"
+  },
+  "keywords": [
+    "async",
+    "unit",
+    "test",
+    "promise",
+    "monitoring"
+  ],
+  "author": "jlmessenger <jlmessenger@users.noreply.github.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jlmessenger/affect/issues"
+  },
+  "homepage": "https://github.com/jlmessenger/affect#readme",
+  "dependencies": {
+    "bluebird": "^3.5.1"
+  },
+  "devDependencies": {
+    "mocha": "^4.0.1"
+  }
+}
