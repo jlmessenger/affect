@@ -1,7 +1,6 @@
-/* eslint-disable newline-per-chained-call */
 const assert = require('assert');
 
-const { buildFunctions, startTest } = require('../lib');
+const { buildFunctions } = require('../');
 const { inner, outer } = require('./util');
 
 describe('buildFunctions', () => {
@@ -21,7 +20,7 @@ describe('buildFunctions', () => {
 			}
 		});
 		return functions.outer('bbb')
-			.delay(0) // ensure event handers are called
+			.then(x => x) // ensure event handers are called
 			.then((out) => {
 				assert.strictEqual(out, 'outer: (inner (inner bbb))');
 				assert.deepEqual(events, [
@@ -33,5 +32,16 @@ describe('buildFunctions', () => {
 					{ event: 'onCallComplete', fn: outer, args: ['bbb'], success: true }
 				]);
 			});
+	});
+	it('can call normal functions', () => {
+		function pi(x) {
+			return [3.14, x];
+		}
+		function callsPi(call) {
+			return call.plain(pi, 159);
+		}
+		const functions = buildFunctions({ callsPi });
+		return functions.callsPi()
+			.then(out => assert.deepEqual(out, [3.14, 159]));
 	});
 });

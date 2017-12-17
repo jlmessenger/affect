@@ -1,6 +1,7 @@
+/* eslint-disable newline-per-chained-call */
 const assert = require('assert');
 
-const { startTest } = require('../lib');
+const { startTest } = require('../');
 const { inner, outer } = require('./util');
 
 describe('startTest', () => {
@@ -42,17 +43,17 @@ describe('startTest', () => {
 	});
 	it('will throw if fn arg is wrong', () => {
 		try {
-			return startTest(outer)
+			startTest(outer)
 				.args('www')
 				.awaitsCall(inner, 'www').callReturns('mock inner www1')
 				.awaitsCall('whoops', 'mock inner www1').callReturns('mock inner www2')
 				.returns('outer: mock inner www2')
 				.throw(new Error('should not run'));
+			throw new Error('should have thrown');
 		} catch (ex) {
 			if (ex.message !== 'awaitsCall() must be a function, got: whoops') {
 				throw ex;
 			}
-			return true;
 		}
 	});
 	it('will throw if mock stack too short', () => startTest(outer)
@@ -138,5 +139,17 @@ describe('startTest', () => {
 					throw err;
 				}
 			});
+	});
+	it('can test calls to plain functions', () => {
+		function pi(x) {
+			return [3.14, x];
+		}
+		function callsPi(call) {
+			return call.plain(pi, 159);
+		}
+		return startTest(callsPi)
+			.args()
+			.awaitsCall(pi, 159).callReturns('pi')
+			.returns('pi');
 	});
 });

@@ -1,6 +1,6 @@
 {
   "name": "affect",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Affect is a micro abstraction layer for Javascript that simplifies unit testing and monitoring side-effects",
   "main": "index.js",
   "engineStrict": true,
@@ -8,7 +8,7 @@
     "node": ">=6.0.0"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "jest --coverage"
   },
   "repository": {
     "type": "git",
@@ -27,10 +27,8 @@
     "url": "https://github.com/jlmessenger/affect/issues"
   },
   "homepage": "https://github.com/jlmessenger/affect#readme",
-  "dependencies": {
-    "bluebird": "^3.5.1"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "mocha": "^4.0.1"
+    "jest": "^21.2.1"
   }
 }

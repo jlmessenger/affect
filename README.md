@@ -104,6 +104,21 @@ describe('findUser', () => {
 });
 ```
 
+## Calling Plain Functions
+There may be time when the function causing the side-effect is outside your control.
+In this case you can wrap it as an _affect_ method, or you can use the short-cut `call.plain()`
+
+```js
+const { readFile } = require('fs-extra');
+
+// even though readFile is not an affect-style method
+// it can be called, and can also be mocked
+async function countLines(call, filePath) {
+	const lines = await call.plain(readFile, filePath);
+	return lines.split('\n').length;
+}
+```
+
 ## Call Monitoring
 The `buildFunctions` method accepts an optional second argument `config`, which can have
 either of following properties: `onCall`, `onCallComplete`.
@@ -181,4 +196,13 @@ return startTest(methodBeingTested)
 	.awaitsCall(methodCalled, 'a').callReturns('mock one')
 	.awaitsCall(otherMethodCalled, 'b').callThrows(new Error('whoops'))
 	.returns({ fail: 'whoops' });
+```
+
+## BYO Promises
+The promise chains returned by the _affect_ calls and unit tests
+can be changed by assigning it into the library as follows:
+```js
+const Bluebird = require('bluebird');
+const affect = require('affect');
+affect.Promise = Bluebird;
 ```
