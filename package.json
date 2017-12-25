@@ -10,6 +10,9 @@
   "scripts": {
     "test": "jest --coverage"
   },
+  "jest": {
+    "testRegex": "(/__tests__/.*|(\\.|/)(spec))\\.jsx?$"
+  },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/jlmessenger/affect.git"

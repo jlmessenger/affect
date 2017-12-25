@@ -1,7 +1,7 @@
 /* eslint-disable newline-per-chained-call */
 const assert = require('assert');
 
-const { startTest } = require('../');
+const startTest = require('../test');
 const { inner, outer } = require('./util');
 
 describe('startTest', () => {
@@ -31,7 +31,7 @@ describe('startTest', () => {
 			.awaitsCall(inner, 'mock inner xxx').callThrows(err)
 			.throws(new Error('rethrow busted'))
 			.then(() => {
-				assert.deepEqual(events, [
+				assert.deepStrictEqual(events, [
 					{ event: 'onCall', fnName: 'outer', args: ['xxx'] },
 					{ event: 'onCall', fnName: 'mockReturn', args: ['inner', 'mock inner xxx'] },
 					{ event: 'onCallComplete', fnName: 'mockReturn', args: ['inner', 'mock inner xxx'], success: true },
@@ -51,7 +51,7 @@ describe('startTest', () => {
 				.throw(new Error('should not run'));
 			throw new Error('should have thrown');
 		} catch (ex) {
-			if (ex.message !== 'awaitsCall() must be a function, got: whoops') {
+			if (ex.message !== '.awaitsCall(fn, ...args) requires first argument as function') {
 				throw ex;
 			}
 		}
@@ -60,7 +60,7 @@ describe('startTest', () => {
 		.args('vvv')
 		.awaitsCall(inner, 'vvv').callReturns('mock inner vvv1')
 		.returns('outer: mock inner vvv1')
-		.then(r => assert.strictEqual(Symbol('THROW'), r, 'Should have thrown'))
+		.then(r => assert.fail(r, null, 'Should have thrown'))
 		.catch((err) => {
 			if (err.message !== '#2: Unexpected call(inner), no more calls expected') {
 				throw err;
@@ -74,7 +74,7 @@ describe('startTest', () => {
 		.awaitsCall(outer, 'mock inner uuu2').callReturns('mock outer uuu3')
 		.awaitsCall(inner, 'mock outer uuu3').callReturns('mock inner uuu4')
 		.returns('outer: mock inner uuu2')
-		.then(r => assert.strictEqual(Symbol('THROW'), r, 'Should have thrown'))
+		.then(r => assert.fail(r, null, 'Should have thrown'))
 		.catch((err) => {
 			if (err.message !== 'Expected additional calls: outer(), inner()') {
 				throw err;
@@ -85,10 +85,9 @@ describe('startTest', () => {
 		.args('ttt')
 		.awaitsCall(inner, 'ttt').callThrows(new Error('broke'))
 		.throws(new Error('wrong error'))
-		.then(r => assert.strictEqual(Symbol('THROW'), r, 'Should have thrown'))
+		.then(r => assert.fail(r, null, 'Should have thrown'))
 		.catch((err) => {
-			// FIXME: better AssertionError predicate
-			if (err.message !== '\'rethrow broke\' === \'wrong error\'') {
+			if (!(err instanceof assert.AssertionError && err.actual === 'rethrow broke' && err.expected === 'wrong error')) {
 				throw err;
 			}
 		})
@@ -98,7 +97,7 @@ describe('startTest', () => {
 		.awaitsCall(inner, 'sss').callReturns('mock inner sss1')
 		.awaitsCall(inner, 'mock inner sss1').callReturns('mock inner sss2')
 		.throws(new Error('will fail'))
-		.then(r => assert.strictEqual(Symbol('THROW'), r, 'Should have thrown'))
+		.then(r => assert.fail(r, null, 'Should have thrown'))
 		.catch((err) => {
 			if (err.message !== 'Returned data, but should have thrown') {
 				throw err;
@@ -117,7 +116,7 @@ describe('startTest', () => {
 			.args('rrr')
 			.awaitsCall(outer, 'rrr').callReturns('mock inner rrr1')
 			.returns('mock inner rrr1')
-			.then(r => assert.strictEqual(Symbol('THROW'), r, 'Should have thrown'))
+			.then(r => assert.fail(r, null, 'Should have thrown'))
 			.catch((err) => {
 				if (err.message !== '#1: Unexpected call(inner), expected call(outer)') {
 					throw err;
@@ -133,7 +132,7 @@ describe('startTest', () => {
 			.args('qqq')
 			.awaitsCall(inner, 'qqq').callReturns('mock inner qqq1')
 			.returns('never checked')
-			.then(r => assert.strictEqual(Symbol('THROW'), r, 'Should have thrown'))
+			.then(r => assert.fail(r, null, 'Should have thrown'))
 			.catch((err) => {
 				if (err.message !== 'throw-it') {
 					throw err;

@@ -1,6 +1,6 @@
 const assert = require('assert');
 
-const { buildFunctions } = require('../');
+const buildFunctions = require('../');
 const { inner, outer } = require('./util');
 
 describe('buildFunctions', () => {
@@ -23,7 +23,7 @@ describe('buildFunctions', () => {
 			.then(x => x) // ensure event handers are called
 			.then((out) => {
 				assert.strictEqual(out, 'outer: (inner (inner bbb))');
-				assert.deepEqual(events, [
+				assert.deepStrictEqual(events, [
 					{ event: 'onCall', fn: outer, args: ['bbb'] },
 					{ event: 'onCall', fn: inner, args: ['bbb'] },
 					{ event: 'onCallComplete', fn: inner, args: ['bbb'], success: true },
@@ -42,6 +42,6 @@ describe('buildFunctions', () => {
 		}
 		const functions = buildFunctions({ callsPi });
 		return functions.callsPi()
-			.then(out => assert.deepEqual(out, [3.14, 159]));
+			.then(out => assert.deepStrictEqual(out, [3.14, 159]));
 	});
 });
