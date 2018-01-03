@@ -1,208 +1,405 @@
 # Affect
 Affect is a micro abstraction layer for Javascript that simplifies unit testing and monitoring side-effects.
 
-## Setup
-```sh
-npm install --save affect
-```
+#### Project Goals
+* Easy to learn - pure functional Javascript
+* Enable fast and painless unit testing
+* Simple interop with existing code and patterns
+* Lightweight and low-impact
 
-## Usage Example
-This example provides a REST api for looking up a user.
+## Writing Affect Methods
+Writing an _affect_ method is the same as writing any normal Javascript promise/async function,
+except the first argument will always be `call`.
 
-The raw database access `queryDb` and user lookup function `findUser`
-are defined as _affect_ methods, where the first argument is `call`.
+Then within the method, any methods with loads state or causes side-effects should not be called
+directly, but rather called using passed-in `call` interface.
 
-The `call` method can be used to call other _affect_ methods. However,
-since they are called indirectly, the _affect_ framework can simplify
-unit testing.
-
-#### `database.js`
-This file contains _affect_ methods for simple SQL based operations.
-Each method has `call` as the first argument, and uses it when
-dispatching to other _affect_ methods.
+#### Affect Method Example
 ```js
-function queryDb(call, sql, inputs) {
-	return getDb()
-		.request()
-		.query(sql, inputs)
-		.then(({recordset}) => recordset);
+// Promise style
+function getUser(call, userId) {
+  return call.async(queryDatabase, `SELECT * FROM users WHERE userId = ${userId}`)
+    .then(({rows}) => {
+      if (rows.length === 0) {
+        throw new NotFoundError('User not found');
+      }
+      return rows[0];
+    });
 }
 
-async function findUser(call, name) {
-	const users = await call(
-		queryDb,
-		'SELECT * FROM users WHERE userName = @name LIMIT 1',
-		{ name }
-	);
-	return Array.isArray(users) && users.length > 0 ? user[0] : null;
+// Async/Await style
+async function getUser(call, userId) {
+  const rows = await call.async(queryDatabase, `SELECT * FROM users WHERE userId = ${userId}`);
+  if (rows.length === 0) {
+    throw new NotFoundError('User not found');
+  }
+  return rows[0];
 }
-
-module.exports = {
-	queryDb,
-	findUser
-};
 ```
 
-#### `functions.js`
-This file converts any _affect_ methods into regular methods, where the
-call argument is removed, allowing them to be called as normal functions.
-```js
-const { buildFunctions } = require('affect');
-const { findUser } = require('./database');
+## Call Interfaces
+* `call(fn, ...args) : Promise` - Call another affect-style method.
+* `call.plain(fn, ...args) : Promise(result)` - Call an async function or a function which returns a Promise.
+* `call.sync(fn, ...args) : result` - Call a synchronous Javascript function.
+* `call.fromCb(fn, ...args) : Promise(result)` - Call a function which uses a node-style callback(err, result).
+* `call.multiCb(fn, ...args) : Promise([...results])` - Call a function which uses a node-style callback(err, result1, result2).
+* `call.context : Object` - Reference to the context object
 
-module.exports = buildFunctions({ findUser /* could add other affect methods */ });
+#### Call Interface Example
+This example demonstrates a variety of the `call` interfaces in a single affect method.
+
+The method is designed to make an HTTP GET request to a uri stored in a JSON config file
+and include the current unix epoch as a querystring param.
+
+```js
+// Promise style
+function sendTime(call) {
+  const unixEpoch = Math.floor(call.sync(Date.now) / 1000);
+  return call.fromCb(fs.readFile, '/path/to/config.json')
+    .then(JSON.parse)
+    .then(config => call.plain(fetch, `${config.url}?time=${unixEpoch}`))
+    .then(response => call.plain(response.json));
+}
+```
+```js
+// async/await style
+async function sendTime(call) {
+  const unixEpoch = Math.floow(call.sync(Date.now) / 1000);
+  const config = JSON.parse(await call.fromCb(fs.readFile, '/path/to/config.json'));
+  const response = await call.plain(fetch, `${config.url}?time=${unixEpoch}`);
+  return await call.plain(response.json);
+}
 ```
 
-#### `server.js`
-This file is a sample REST api server that shows an example of using
-the built function `findUser` as a normal function (no call argument needed).
+## Simple Unit Testing
+You've now learned how simple it is to write an _affect_ method using the `call` interfaces.
+However, the real advantage of making those small changes becomes clear when writing unit tests.
+
+Let's expand the call interface example from before to include additional error handling logic.
+
 ```js
-const express = require('express');
-const app = module.exports = express();
+async function sentTime(call) {
+  const unixEpoch = Math.floow(call.sync(Date.now) / 1000);
+  try {
+    const config = JSON.parse(await call.fromCb(fs.readFile, '/path/to/config.json'));
+  } catch (err) {
+    throw new InvalidConfigError(`Unable to read config file: ${err.message}`);
+  }
+  const response = await call.plain(fetch, `${config.url}?time=${unixEpoch}`);
+  if (!response.ok) {
+    throw new HttpCallFailure(`HTTP Error ${response.status}`);
+  }
+  return await call.plain(response.json);
+}
+```
 
-const { findUser } = require('./functions');
+Normally getting full unit-test coverage on this function would require many mocks, often provided by a tool like Sinon.
+With Affect unit tests are as simple as describing each intended call with arguments and the final method outcome.
 
-app.get('/user/:name', (req, res, next) => {
-	return findUser(req.params.name)
-		.then(response => res.json(response))
-		.catch(next);
+#### Unit Test Example
+
+```js
+// Example assumes mocha or jest style tests - but any test-runner will work.
+// Also assumes all other referenced functions have already been imported/required.
+const startTest = require('affect/test');
+describe('sentTime()', () => {
+  it('works on happy-path', () =>
+    startTest(sentTime).args()
+      .awaitsCall(Date.now)
+        .callReturns(1515364390001)
+      .awaitsCall(fs.readFile, '/path/to/config.json')
+        .callReturns('{"url":"http://example.com"}')
+      .awaitsCall(fetch, 'http://example.com?time=151536439')
+        .callReturns(new Response(new Blob('{"ok":true}'), {status: 200}))
+      .returns({ok: true})
+  );
+  it('converts error if config not found', () =>
+    startTest(sentTime).args()
+      .awaitsCall(Date.now).callReturns(1515364390001)
+      .awaitsCall(fs.readFile, '/path/to/config.json').callThrows(new Error('Not Found'))
+      .throws(new InvalidConfigError('Unable to read config file: Not Found'))
+  );
+  it('converts error if config invalid JSON', () =>
+    startTest(sentTime).args()
+      .awaitsCall(Date.now).callReturns(1515364390001)
+      .awaitsCall(fs.readFile, '/path/to/config.json').callReturns('bad-json')
+      .throws(new InvalidConfigError('Unable to read config file: Unexpected token b in JSON at position 0'))
+  );
+  it('passes thru fetch failure', () =>
+    startTest(sentTime).args()
+      .awaitsCall(Date.now).callReturns(1515364390001)
+      .awaitsCall(fs.readFile, '/path/to/config.json').callReturns('{"url":"http://example.com"}')
+      .awaitsCall(fetch, 'http://example.com?time=151536439').callThrows(new Error('passed-thru'))
+      .throws(new Error('passed-thru'))
+  );
+  it('fails on non 2xx responses', () =>
+    startTest(sentTime).args()
+      .awaitsCall(Date.now)
+        .callReturns(1515364390001)
+      .awaitsCall(fs.readFile, '/path/to/config.json')
+        .callReturns('{"url":"http://example.com"}')
+      .awaitsCall(fetch, 'http://example.com?time=151536439')
+        .callReturns(new Response(new Blob('{"ok":false}'), {status: 500}))
+      .throws(new HttpCallFailure(`HTTP Error 500`))
+  );
 });
 ```
 
-#### `find-user.spec.js`
-This file shows how unit test mocks can be simplified for _affect_ methods.
-The unit test covers all aspects of the method, but is able to mock the
-calls to the `queryDb` method.
+### startTest Interface
+The `startTest` method creates a new test chain which you can use to describe the expected calls, and mock their outputs.
+
+The test chain always starts with `startTest(fn).args(arg1, arg2)` and ends with `.throws(error)` or `.returns(data)`.
+In between you add as many `.awaitsCall(fn, ...args).callReturns(mockData)`, `.awaitsCall(fn, ...args).callThrows(mockError)`
+or `.awaitsAllCalls([...])` entries as needed to descibe all the methods directly called by the affect method being tested.
+
+Below is a detailed description of the test chain methods:
+
+* `startTest(fn, config)`  
+  Creates a new test chain for the specified affect method `fn`.  
+  Must be followed by `.args()`.
+  
+  `config` is an optional object with the following properties:  
+  * `context` - context object
+  * `onFunction` - event handler called when before `fn` is executed
+  * `onCall` - event handler called when before each mock is executed
+  * `onCallComplete` - event handler called after each mock is executed
+  * `onFunctionComplete` - event handler called after `fn` is executed
+* `.args(arg1, arg2, ...)`  
+  Passes the provided arguments into the affect method being tested.  
+  Must be followed by `.awaitsCall()` or `.awaitsAllCalls()`.
+* `.awaitsCall(expectedFn, expectedArg1, expectedArg2, ...)`  
+  Asserts that the affect method being tested calls the function `expectedFn` with the provided arguments.
+  Arguments are compared with `assert.deepStrictEqual`.  
+  Must be followed be either `.callReturns()` or `.callThrows()`.
+* `.callReturns(data)`  
+  Defines the mock data to return/resolve for the call.  
+  Must be followed be either another `.awaitsCall()` or `.awaitsAllCalls()`
+  or the test chain can be ended with `.returns()` or `.throws()`.
+* `.callThrows(error)`  
+  Defines the mock error instance to throw/reject for the call.  
+  Must be followed be either another `.awaitsCall()` or `.awaitsAllCalls()`
+  or the test chain can be ended with `.returns()` or `.throws()`.
+* `.awaitsAllCalls(CallMocks[])`  
+  Define a bulk set of calls as an array of CallMock objects. This is especially useful when the
+  affect method being tested uses `Promise.all()` to execute calls in parallel.  
+  Must be followed be either another `.awaitsCall()` or `.awaitsAllCalls()`
+  or the test chain can be ended with `.returns()` or `.throws()`.
+  Each `CallMock` object must have the following properties:  
+  * `fn` the expected function
+  * `args` the expected arguments passed the `fn`
+  * `success` boolean, set to false and mock will throw/reject the `result`
+  * `result` the mock data to return or throw
+* `.returns(data)`  
+  Asserts that the affect method being tested returns the specified data.  
+  Data is compared using `assert.deepStrictEqual`.  
+  Return a `Promise` that resolves when the test has passed, or rejects with a test failure.
+* `.throws(error)`  
+  Asserts that the affect method being tested throws the specified error.
+  Error instances are asserted to be the same type and have the same error message.
+  Non-error objects are simply compared for deep equality.  
+  Returns a `Promise` that resolves when the test has passed, or rejects with a test failure.
+
+#### Promise.all Unit Test Example
+Suppose an affect method makes a group of calls in parallel using `Promise.all()`.
+These parallel calls can be easily tested using `.awaitsAllCalls`
 
 ```js
-const { startTest } = require('affect');
-const { findUser, queryDb } = require('./database');
-
-describe('findUser', () => {
-	it('returns first row', () => {
-		const userRowFixture = { userId: 100, name: 'someuser', email: 'someuser@example.com' };
-		return startTest(findUser)
-			.args(userRowFixture.name)
-			.awaitsCall(queryDb, userRowFixture.name).callReturns({ recordset: [userRowFixture] })
-			.returns(userRowFixture)
-	});
-	it('returns null if no results', () => {
-		const name = 'notfound';
-		return startTest(findUser)
-			.args(name)
-			.awaitsCall(queryDb, name).callReturns({ recordset: [] })
-			.returns(null);
-	});
-	it('passes-thru db errors', () => {
-		const name = 'willthrow';
-		const dbError = new Error('DB error');
-		return startTest(findUser)
-			.args(name)
-			.awaitsCall(queryDb, name).callThrows(dbError)
-			.throws(dbError);
-	});
+// Method to be tested
+function concatFiles(call, ...filePaths) {
+  const parallelReads = filePaths.map(filePath => call.fromCb(fs.readFile, filePath));
+  return Promise.all(parallelReads)
+    .then(allFiles => allFiles.join('\n'));
+}
+```
+```js
+// Unit test example
+describe('concatFiles()', () => {
+  it('will combine all files', () => {
+    // human readable
+    const mockFiles = {
+      'a.txt': 'first\nfile',
+      'b.txt': 'second\nfile',
+      'c.txt': 'third'
+    };
+    // convert to CallMock object
+    const mockFileNames = Object.keys(mockFiles);
+    const mockReadCalls = mockFileNames.map(filePath => (
+      { fn: fs.readFile, args: [filePath], success: true, result: mockFiles[filePath] }
+    ));
+    return startTest(concatFiles).args(...mockFileNames)
+      .awaitsAllCalls(mockReadCalls)
+      .returns('first\nfile\nsecond\nfile\nthird');
+  });
 });
 ```
 
-## Calling Plain Functions
-There may be time when the function causing the side-effect is outside your control.
-In this case you can wrap it as an _affect_ method, or you can use the short-cut `call.plain()`
+## Using Affect Methods
+You've now seen how easy it is to write methods in the affect style, and how that simplifies unit testing.
+But how do you use these methods in normal code?
+
+### affect Interface
+To make an affect style method available to the rest of your code, you need to convert it to a regular function.
+This is done by using `affect`.
 
 ```js
-const { readFile } = require('fs-extra');
-
-// even though readFile is not an affect-style method
-// it can be called, and can also be mocked
-async function countLines(call, filePath) {
-	const lines = await call.plain(readFile, filePath);
-	return lines.split('\n').length;
-}
-```
-
-## Call Monitoring
-The `buildFunctions` method accepts an optional second argument `config`, which can have
-either of following properties: `onCall`, `onCallComplete`.
-
-Below is an example of how the `function.js` file could be updated with these event handlers.
-
-#### Example `functions.js`
-```js
-const { buildFunctions } = require('affect');
-const { findUser } = require('./database');
-
-const config = {
-	onCall({ fn, args }) {
-		const nice = args.map(a => inspect(a, { breakLength: Infinity })).join(', ');
-		console.log('[START CALL]', `${fn.name}(${nice})`);
-	},
-	onCallComplete({ fn, success, latency, result }) {
-		if (success) {
-			console.log('[END CALL]', `${latency}ms ${fn.name}() - RESULT:`, result);
-		} else {
-			console.warn('[END CALL]', `${latency}ms ${fn.name}() - ERROR:`, result);
-		}
-	}
-};
-
-module.exports = buildFunctions({ findUser }, config);
-```
-
-If an API request was made to `/user/frankie`, the logs would show:
-```sh
-[START CALL] findUser('frankie')
-[START CALL] queryDb('SELECT * FROM users WHERE userName = @name LIMIT 1', { name: 'frankie' })
-[END CALL] 103ms queryDb() - RESULT: [{ userId: 101, name: 'frankie', email: 'frankie@example.com' }]
-[END CALL] 106ms findUser() - RESULT: { userId: 101, name: 'frankie', email: 'frankie@example.com' }
-```
-
-## Unit Test Interface
-* `startTest(method)` - The _affect_ method which will be run during the test.
-* `.args(arg, uments)` - Arguments to pass into the method when the test is run.
-* `.awaitsCall(method, arg, uments)` - Each `call()` within the method being tested, and the arguments it expects to be passed.
-* `.callReturns(data)` - Mock data to return for the call.
-* `.callThrows(error)` - Error to throw from the call.
-* `.returns(expectedOutput)` - Expected output from the test method
-* `.throws(expectedError)` - Expected rejection from the test method
-
-#### Examples:
-```js
-async function methodBeingTested(call, one, two) {
-	const a = await call(methodCalled, one);
-	try {
-		const b = await call(otherMethodCalled, two);
-		return { a, b };
-	} catch (ex) {
-		return { fail: ex.message };
-	}
-}
-
-// both calls succeed, so method returns output
-return startTest(methodBeingTested)
-	.args('a', 'b')
-	.awaitsCall(methodCalled, 'a').callReturns('mock one')
-	.awaitsCall(otherMethodCalled, 'b').callReturns('mock two')
-	.returns({ a: 'mock one', b: 'mock two' });
-
-// first calls throws, but is it not caught so method throws
-return startTest(methodBeingTested)
-	.args('a', 'b')
-	.awaitsCall(methodCalled, 'a').callThrows(new Error('whoops'))
-	.throws(new Error('whoops'));
-
-// first call succeeds, second call throws but is caught
-// so method returns alternate output
-return startTest(methodBeingTested)
-	.args('a', 'b')
-	.awaitsCall(methodCalled, 'a').callReturns('mock one')
-	.awaitsCall(otherMethodCalled, 'b').callThrows(new Error('whoops'))
-	.returns({ fail: 'whoops' });
-```
-
-## BYO Promises
-The promise chains returned by the _affect_ calls and unit tests
-can be changed by assigning it into the library as follows:
-```js
-const Bluebird = require('bluebird');
 const affect = require('affect');
+const getUser = require('./methods/get-user');
+const concatFiles = require('./methods/concat-files');
+const sendTime = require('./methods/send-time');
+const functions = affect({
+  getUser,
+  concatFiles,
+  sendTime
+});
+module.exports = functions;
+```
+
+The above code imports/requires each method that you need to call directly, and then exports it without the call argument.
+You can now simply use each function without worrying about `call` argument. Examples:
+
+* `functions.getUser(userId)`
+* `functions.concatFiles(...filePaths)`
+* `functions.sendTime()`
+
+## Getting Telemetry
+The `affect` function accepts an optional `config` object as it's second argument. You can specify the following event handers:
+
+* `onFunction` - event handler called when before exported affect function is executed  
+  Event hander arguments: `{ fn: Function, args: Array, context: Object, start: timeMs }`.
+* `onCall` - event handler called when before each call method is executed  
+  Event hander arguments: `{ fn: Function, args: Array, context: Object, start: timeMs }`.
+* `onCallComplete` - event handler called after each mock is executed  
+  Event hander arguments: `{ fn: Function, args: Array, context: Object, start: timeMs, end: timeMs, latency: Ms, success: boolean, result: data/error }`.
+* `onFunctionComplete` - event handler called after `fn` is executed  
+  Event hander arguments: `{ fn: Function, args: Array, context: Object, start: timeMs, end: timeMs, latency: Ms, success: boolean, result: data/error }`.
+
+#### Detailed Logging Example
+This example will print each function and call to the `console.log`.
+
+```js
+const affect = require('affect');
+const getUser = require('./methods/get-user');
+const concatFiles = require('./methods/concat-files');
+const sendTime = require('./methods/send-time');
+const config = {
+  onFunction({ fn }) {
+    console.log('onFunction:', fn.name);
+  },
+  onFunctionComplete({ fn, latency, success, result }) {
+    const outcome = success ? 'Completed' : `Error: ${result.message}`;
+    console.log('onFunctionComplete:', fn.name, outcome, `(${latency}ms)`);
+  },
+  onCall({ fn }) {
+    console.log('onCall:', fn.name);
+  },
+  onCallComplete({ fn, latency, success, result }) {
+    const outcome = success ? 'Returned' : `Error: ${result.message}`;
+    console.log('onCallComplete:', fn.name, outcome, `(${latency}ms)`);
+  }
+};
+const functions = affect({
+  getUser,
+  concatFiles,
+  sendTime
+}, config);
+module.exports = functions;
+```
+
+The output log from calling `functions.sendTime()` with the above `config` handlers would look like:
+
+```
+onFunction: sendTime
+onCall: now
+onCallComplete: now Completed (1ms)
+onCall: readFile
+onCallComplete: readFile Completed (46ms)
+onCall: fetch
+onCallComplete: fetch Completed (315ms)
+onCall: json
+onCallComplete: json Completed (6ms)
+onFunctionComplete: sendTime Completed (398ms)
+```
+
+## Using context
+The `affect` config object allows an optional `context` property to be provided.
+This object can be read within event handlers and within affect methods using `call.context`.
+
+Additionaly each function built by `affect` has an additional property `.withContext()`.
+Calling the function using `.withContext(context, ...args)` will merge invokation specific context with the original config values.
+
+
+#### Context example
+```js
+const affect = require('affect');
+const getUser = require('./methods/get-user');
+const concatFiles = require('./methods/concat-files');
+const sendTime = require('./methods/send-time');
+const config = {
+  context: { overridden: false, notchanged: true }
+};
+const functions = affect({
+  getUser,
+  concatFiles,
+  sendTime
+}, config);
+module.exports = functions;
+```
+
+If you used `functions.sendTime.withContext({ overridden: true })` then the `call.context` object would be:  
+`{ overridden: true, notchanged: true }`
+
+### Why context?
+While all your code is simple to unit test, you may want to use runtime validation patterns or enable
+end-to-end tests using actual code paths. Using the context object allows you to include additional
+side-channel information for this purpose.
+
+#### Selectivly disable logging example
+In the example below, calling `functions.sendTime()` would be logged, but `functions.sendTime.withContext({ logging: false })` would not be logged.
+
+```js
+const affect = require('affect');
+const sendTime = require('./methods/send-time');
+const config = {
+  context: { logging: true },
+  onFunction({ fn, context }) {
+    if (context.logging) {
+      console.log('onFunction:', fn.name);
+    }
+  }
+};
+const functions = affect({
+  sendTime
+}, config);
+module.exports = functions;
+```
+
+#### End-to-end test example
+In the example below, we assume there is an automated end-to-end test harness, which creates actual data, but needs to track which records are tests, so they can be cleaned up periodically.
+
+When `functions.saveUser(userData)` is called normally the data is not saved as a test record.
+However, when called with `functions.saveUser.withContext({ isE2E: true }, userData)` the `recordTest` method will be called.
+
+```js
+async function saveUser(call, userData) {
+  const userId = call(insertUser, userData);
+  if (call.isE2E) {
+    await recordTest({ table: 'users', field: 'userId', value: userId });
+  }
+  return userId;
+}
+```
+
+#### Final thoughts on context
+You should never be putting very much information into the context. All other program state and configuration should be read directly using unit testable functions and the `call` interfaces. Context is intended only for special cases of testing within a runtime, and should NEVER be used as a way to inject general application config or state data.
+
+## Notes on Promises
+By default all Affect functions and tests will return whatever global `Promise` object is defined in the enviornment. For older browsers remember to include your favorite shim.
+
+### BYO Promise
+Affect can use your favorite promise library in Affect by assigning it to `affect.Promise`. Just ensure you assign it before using `affect()` or `startTest()`.
+
+```js
+const affect = require('affect');
+const Bluebird = require('bluebird');
 affect.Promise = Bluebird;
 ```

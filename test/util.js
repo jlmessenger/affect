@@ -12,7 +12,12 @@ async function outer(call, x) {
 	}
 }
 
+function callsEach(call) {
+	return call(inner, '_').then(() => Promise.all(['static', call(inner, 'a'), call(inner, 'b')]));
+}
+
 module.exports = {
 	inner,
-	outer
+	outer,
+	callsEach
 };
