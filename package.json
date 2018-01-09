@@ -31,6 +31,13 @@
     "url": "https://github.com/jlmessenger/affect/issues"
   },
   "homepage": "https://github.com/jlmessenger/affect#readme",
+  "files": [
+    "lib",
+    "test",
+    "index.js",
+    "test.js",
+    "README.md"
+  ],
   "dependencies": {},
   "devDependencies": {
     "jest": "^21.2.1",

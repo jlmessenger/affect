@@ -1,5 +1,5 @@
 /* eslint-disable newline-per-chained-call */
-const assert = require('assert');
+const assert = require('../lib/assert');
 const { inherits } = require('util');
 const startTest = require('../test');
 const { inner, outer, callsEach } = require('./util');
@@ -38,7 +38,7 @@ describe('startTest', () => {
 			.callThrows(new Error('tempe-error'))
 			.throws(new TempE('tempe-error'))
 			.catch(err => {
-				if (err.message !== 'Error must be instance of TempE') {
+				if (!/^Error must be instance of TempE/.test(err.message)) {
 					throw err;
 				}
 			});
@@ -138,7 +138,7 @@ describe('startTest', () => {
 				.throw(new Error('should not run'));
 			throw new Error('should have thrown');
 		} catch (ex) {
-			if (ex.message !== '.awaitsCall(fn, ...args) requires first argument as function') {
+			if (!/^\.awaitsCall\(fn, \.\.\.args\) requires first argument as function/.test(ex.message)) {
 				throw ex;
 			}
 		}
@@ -151,7 +151,7 @@ describe('startTest', () => {
 			.returns('outer: mock inner vvv1')
 			.then(r => assert.fail(r, null, 'Should have thrown'))
 			.catch(err => {
-				if (err.message !== '#2: Unexpected call(inner), no more calls expected') {
+				if (!/^#2: Unexpected call\(inner\), no more calls expected/.test(err.message)) {
 					throw err;
 				}
 			}));
@@ -169,7 +169,7 @@ describe('startTest', () => {
 			.returns('outer: mock inner uuu2')
 			.then(r => assert.fail(r, null, 'Should have thrown'))
 			.catch(err => {
-				if (err.message !== 'Expected additional calls: outer(), inner()') {
+				if (!/^Expected additional calls: outer\(\), inner\(\)/.test(err.message)) {
 					throw err;
 				}
 			}));
@@ -182,11 +182,8 @@ describe('startTest', () => {
 			.then(r => assert.fail(r, null, 'Should have thrown'))
 			.catch(err => {
 				if (
-					!(
-						err instanceof assert.AssertionError &&
-						err.actual === 'rethrow broke' &&
-						err.expected === 'wrong error'
-					)
+					(err.actual || err.matcherResult.actual) !== 'rethrow broke' &&
+					(err.expected || err.matcherResult.expected) !== 'wrong error'
 				) {
 					throw err;
 				}
@@ -201,7 +198,7 @@ describe('startTest', () => {
 			.throws(new Error('will fail'))
 			.then(r => assert.fail(r, null, 'Should have thrown'))
 			.catch(err => {
-				if (err.message !== 'Returned data, but should have thrown') {
+				if (!/Returned data, but should have thrown/.test(err.message)) {
 					throw err;
 				}
 			}));
@@ -220,7 +217,7 @@ describe('startTest', () => {
 			.returns('mock inner rrr1')
 			.then(r => assert.fail(r, null, 'Should have thrown'))
 			.catch(err => {
-				if (err.message !== '#1: Unexpected call(inner), expected call(outer)') {
+				if (!/^#1: Unexpected call\(inner\), expected call\(outer\)/.test(err.message)) {
 					throw err;
 				}
 			});
@@ -237,7 +234,7 @@ describe('startTest', () => {
 			.returns('never checked')
 			.then(r => assert.fail(r, null, 'Should have thrown'))
 			.catch(err => {
-				if (err.message !== 'throw-it') {
+				if (!/^throw-it/.test(err.message)) {
 					throw err;
 				}
 			});

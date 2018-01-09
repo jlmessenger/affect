@@ -1,4 +1,4 @@
-const assert = require('assert');
+const assert = require('../lib/assert');
 const startTest = require('../test');
 
 function methodCalled(call, x) {
@@ -17,7 +17,7 @@ describe('startTest failures', () => {
 			.returns('mock')
 			.then(r => assert.fail(r, null, 'Should have thrown'))
 			.catch(err => {
-				if (err.message !== '#1: Unexpected arguments for methodCalled()') {
+				if (!/#1: Unexpected arguments for methodCalled\(\)/.test(err.message)) {
 					throw err;
 				}
 			}));

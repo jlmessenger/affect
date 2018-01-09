@@ -7,8 +7,24 @@ Affect is a micro abstraction layer for Javascript that simplifies unit testing 
 * Simple interop with existing code and patterns
 * Lightweight and low-impact
 
+#### Setup
+```sh
+npm install --save affect
+```
+
+#### Contents
+ * [Writing Affect Methods](#writing-affect-methods)
+ * [Call Interfaces](#call-interfaces)
+ * [Simple Unit Testing](#simple-unit-testing)
+   * [startTest Interface](#starttest-interface)
+ * [Using Affect Methods](#using-affect-methods)
+   * [affect Interface](#affect-interface)
+   * [Getting Telemetry](#getting-telemetry)
+   * [Using Context](#using-context)
+ * [Notes on Promises](#notes-on-promises)
+
 ## Writing Affect Methods
-Writing an _affect_ method is the same as writing any normal Javascript promise/async function,
+Writing an affect method is the same as writing any normal Javascript promise/async function,
 except the first argument will always be `call`.
 
 Then within the method, any methods with loads state or causes side-effects should not be called
@@ -72,7 +88,7 @@ async function sendTime(call) {
 ```
 
 ## Simple Unit Testing
-You've now learned how simple it is to write an _affect_ method using the `call` interfaces.
+You've now learned how simple it is to write an affect method using the `call` interfaces.
 However, the real advantage of making those small changes becomes clear when writing unit tests.
 
 Let's expand the call interface example from before to include additional error handling logic.
@@ -233,6 +249,13 @@ describe('concatFiles()', () => {
 });
 ```
 
+### Test Runners
+Affect has been written to produce nice errors in both mocha and jest. By default the assertions
+made within a `startTest` chain will use node's native `assert` methods, but if a global `expect`
+interface is available (as provided by jest), that interface will be used.
+
+Any test runner which supports promises as reject = fail, resolve = pass should work with Affect.
+
 ## Using Affect Methods
 You've now seen how easy it is to write methods in the affect style, and how that simplifies unit testing.
 But how do you use these methods in normal code?
@@ -261,7 +284,7 @@ You can now simply use each function without worrying about `call` argument. Exa
 * `functions.concatFiles(...filePaths)`
 * `functions.sendTime()`
 
-## Getting Telemetry
+### Getting Telemetry
 The `affect` function accepts an optional `config` object as it's second argument. You can specify the following event handers:
 
 * `onFunction` - event handler called when before exported affect function is executed  
@@ -320,13 +343,12 @@ onCallComplete: json Completed (6ms)
 onFunctionComplete: sendTime Completed (398ms)
 ```
 
-## Using context
+### Using Context
 The `affect` config object allows an optional `context` property to be provided.
 This object can be read within event handlers and within affect methods using `call.context`.
 
 Additionaly each function built by `affect` has an additional property `.withContext()`.
 Calling the function using `.withContext(context, ...args)` will merge invokation specific context with the original config values.
-
 
 #### Context example
 ```js
@@ -348,7 +370,7 @@ module.exports = functions;
 If you used `functions.sendTime.withContext({ overridden: true })` then the `call.context` object would be:  
 `{ overridden: true, notchanged: true }`
 
-### Why context?
+#### Why context?
 While all your code is simple to unit test, you may want to use runtime validation patterns or enable
 end-to-end tests using actual code paths. Using the context object allows you to include additional
 side-channel information for this purpose.

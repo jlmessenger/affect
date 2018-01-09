@@ -1,5 +1,4 @@
-const assert = require('assert');
-
+const assert = require('../lib/assert');
 const buildFunctions = require('../');
 const { execRunner } = require('../lib/build-call');
 const { inner, outer } = require('./util');
