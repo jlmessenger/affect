@@ -1,1 +1,1 @@
-module.exports = require('./lib/start-test');
+module.exports = require('./dist/affect-test.js');

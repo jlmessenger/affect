@@ -116,7 +116,7 @@ function methodRunner(opts, fn, ...args) {
 }
 
 // Runners for each call.<method>() interface
-const callRunners = {
+export const callRunners = {
 	call(opts, fn, ...args) {
 		return runPromise(opts, callEvents, args, fn, [opts.call, ...args]);
 	},
@@ -140,6 +140,21 @@ const callRunners = {
 	}
 };
 
+/**
+ * Create call interface from runners
+ * @param {Object} runners
+ * @param {Function} runners.call
+ * @param {Function} runners.plain
+ * @param {Function} runners.sync
+ * @param {Function} runners.fromCb
+ * @param {Function} runners.multiCb
+ * @param {Function} runners.context
+ * @param {Object} opts
+ * @param {Object} promise - Promise constructor
+ * @param {EventEmitter} emitter
+ * @param {Object} context
+ * @returns {Object}
+ */
 function createCallInterface(runners, opts) {
 	const call = (opts.call = runners.call.bind(null, opts));
 	call.plain = runners.plain.bind(null, opts);
@@ -153,6 +168,7 @@ function createCallInterface(runners, opts) {
 /**
  * Combine group and local context into localOpts object
  * @param {Object} opts
+ * @param {Object} opts.context
  * @param {Object} methodContext
  * @returns {Object} localOpts
  */
@@ -169,7 +185,7 @@ function buildLocalOpts(opts, methodContext) {
  * @param {Object} [runners]
  * @returns {Function} methodInit(fn)
  */
-function buildCall(promise, emitter, context, runners = callRunners) {
+export function buildCall(promise, emitter, context, runners) {
 	const opts = { promise, emitter, context, call: null };
 
 	const call = createCallInterface(runners, opts);
@@ -186,6 +202,3 @@ function buildCall(promise, emitter, context, runners = callRunners) {
 
 	return methodInit;
 }
-buildCall.callRunners = callRunners;
-
-module.exports = buildCall;

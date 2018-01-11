@@ -3,22 +3,47 @@
   "version": "0.3.0",
   "description": "Affect is a micro abstraction layer for Javascript that simplifies unit testing and monitoring side-effects",
   "main": "index.js",
-  "engineStrict": true,
+  "module": "dist/affect.es.js",
+  "jsnext:main": "src/index.mjs",
+  "browser": {
+    "./index.js": "./dist/affect.js",
+    "./test.js": "./dist/affect-test.js"
+  },
   "engines:": {
-    "node": ">=6.0.0"
+    "node": ">=4.2.0",
+    "npm": ">=3.3.0"
   },
   "scripts": {
-    "test": "jest --coverage",
-    "fmt": "prettier --use-tabs --single-quote --print-width 100 --write \"{lib,test}/**/*.js\" \"*.js\""
+    "build": "npm run clean && npm run rollup",
+    "clean": "rm dist/*.js || true && rm dist/*.map || true",
+    "fmt": "prettier --use-tabs --single-quote --print-width 100 --write \"{src,test,config}/**/*.{js,mjs}\" \"*.{js,mjs}\"",
+    "prepublish": "npm run build",
+    "rollup": "npm run rollup-affect && npm run rollup-affect-test",
+    "rollup-affect": "rollup -c config/rollup-affect.mjs",
+    "rollup-affect-test": "rollup -c config/rollup-affect-test.mjs",
+    "test": "npm run test-jest && npm run build && npm run test-mocha",
+    "test-mocha": "nyc mocha \"test/mocha.js\"",
+    "test-jest": "jest --coverage"
   },
   "jest": {
-    "testRegex": "(/__tests__/.*|(\\.|/)(spec))\\.jsx?$"
+    "moduleFileExtensions": ["js", "json", "mjs"],
+    "collectCoverageFrom": [
+      "src/**/*.mjs"
+    ],
+    "testRegex": "test\/jest\\.mjs",
+    "transform": {
+      "^.+\\.mjs?$": "babel-jest"
+    }
+  },
+  "babel": {
+    "plugins": ["transform-es2015-modules-commonjs"]
   },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/jlmessenger/affect.git"
   },
   "keywords": [
+    "affect",
     "async",
     "unit",
     "test",
@@ -32,7 +57,9 @@
   },
   "homepage": "https://github.com/jlmessenger/affect#readme",
   "files": [
-    "lib",
+    "config",
+    "dist",
+    "src",
     "test",
     "index.js",
     "test.js",
@@ -40,7 +67,14 @@
   ],
   "dependencies": {},
   "devDependencies": {
+    "babel-jest": "^22.0.6",
+    "babel-plugin-transform-es2015-modules-commonjs": "^6.26.0",
     "jest": "^21.2.1",
-    "prettier": "^1.9.2"
+    "mocha": "^4.1.0",
+    "nyc": "^11.4.1",
+    "prettier": "^1.10.2",
+    "rollup": "^0.53.4",
+    "rollup-plugin-buble": "^0.18.0",
+    "rollup-plugin-replace": "^2.0.0"
   }
 }

@@ -1,6 +1,7 @@
 function inner(_, x) {
 	return `(inner ${x})`;
 }
+
 async function outer(call, x) {
 	try {
 		const y = await call(inner, x);
@@ -16,8 +17,17 @@ function callsEach(call) {
 	return call(inner, '_').then(() => Promise.all(['static', call(inner, 'a'), call(inner, 'b')]));
 }
 
+function delay(ms) {
+	return output => {
+		return new Promise(resolve => {
+			setTimeout(resolve, ms, output);
+		});
+	};
+}
+
 module.exports = {
 	inner,
 	outer,
-	callsEach
+	callsEach,
+	delay
 };

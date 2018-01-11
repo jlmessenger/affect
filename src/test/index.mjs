@@ -1,6 +1,7 @@
-const assert = require('./assert');
-const buildCall = require('./build-call');
-const affect = require('./');
+import affect from '../index.mjs';
+import assert from './assert.mjs';
+
+const { buildCall, configEmitter, callRunners } = affect._internal;
 
 function mockCallPlain(fnName, { success, result }) {
 	if (success) {
@@ -37,8 +38,8 @@ const whichMock = {
 };
 
 // Build mock runners for each call.<method>() interface
-const mockRunners = Object.keys(buildCall.callRunners).reduce((forMock, name) => {
-	const realRunner = buildCall.callRunners[name];
+const mockRunners = Object.keys(callRunners).reduce((forMock, name) => {
+	const realRunner = callRunners[name];
 	forMock[name] = (opts, fn, ...args) => {
 		const mockArgs = opts.context.verify(fn, args);
 		return realRunner(opts, whichMock[name], ...mockArgs);
@@ -106,10 +107,10 @@ class MockStack {
  * @param {Function} testConfig.onCallComplete
  * @param {Object} testConfig.context
  */
-function startTest(testFn, testConfig = {}) {
+export default function affectTest(testFn, testConfig = {}) {
 	assert.strictEqual(typeof testFn, 'function', 'startTest(fn) requires a function argument');
 	const { context = {} } = testConfig;
-	const emitter = affect.configureEmitter(testConfig);
+	const emitter = configEmitter(testConfig);
 
 	const stack = new MockStack();
 
@@ -314,5 +315,3 @@ function startTest(testFn, testConfig = {}) {
 	};
 	return init;
 }
-
-module.exports = startTest;

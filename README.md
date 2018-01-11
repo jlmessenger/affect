@@ -16,7 +16,7 @@ npm install --save affect
  * [Writing Affect Methods](#writing-affect-methods)
  * [Call Interfaces](#call-interfaces)
  * [Simple Unit Testing](#simple-unit-testing)
-   * [startTest Interface](#starttest-interface)
+   * [affectTest Interface](#affectTest-interface)
  * [Using Affect Methods](#using-affect-methods)
    * [affect Interface](#affect-interface)
    * [Getting Telemetry](#getting-telemetry)
@@ -117,10 +117,10 @@ With Affect unit tests are as simple as describing each intended call with argum
 ```js
 // Example assumes mocha or jest style tests - but any test-runner will work.
 // Also assumes all other referenced functions have already been imported/required.
-const startTest = require('affect/test');
+const affectTest = require('affect/test');
 describe('sentTime()', () => {
   it('works on happy-path', () =>
-    startTest(sentTime).args()
+    affectTest(sentTime).args()
       .awaitsCall(Date.now)
         .callReturns(1515364390001)
       .awaitsCall(fs.readFile, '/path/to/config.json')
@@ -130,26 +130,26 @@ describe('sentTime()', () => {
       .returns({ok: true})
   );
   it('converts error if config not found', () =>
-    startTest(sentTime).args()
+    affectTest(sentTime).args()
       .awaitsCall(Date.now).callReturns(1515364390001)
       .awaitsCall(fs.readFile, '/path/to/config.json').callThrows(new Error('Not Found'))
       .throws(new InvalidConfigError('Unable to read config file: Not Found'))
   );
   it('converts error if config invalid JSON', () =>
-    startTest(sentTime).args()
+    affectTest(sentTime).args()
       .awaitsCall(Date.now).callReturns(1515364390001)
       .awaitsCall(fs.readFile, '/path/to/config.json').callReturns('bad-json')
       .throws(new InvalidConfigError('Unable to read config file: Unexpected token b in JSON at position 0'))
   );
   it('passes thru fetch failure', () =>
-    startTest(sentTime).args()
+    affectTest(sentTime).args()
       .awaitsCall(Date.now).callReturns(1515364390001)
       .awaitsCall(fs.readFile, '/path/to/config.json').callReturns('{"url":"http://example.com"}')
       .awaitsCall(fetch, 'http://example.com?time=151536439').callThrows(new Error('passed-thru'))
       .throws(new Error('passed-thru'))
   );
   it('fails on non 2xx responses', () =>
-    startTest(sentTime).args()
+    affectTest(sentTime).args()
       .awaitsCall(Date.now)
         .callReturns(1515364390001)
       .awaitsCall(fs.readFile, '/path/to/config.json')
@@ -161,16 +161,16 @@ describe('sentTime()', () => {
 });
 ```
 
-### startTest Interface
-The `startTest` method creates a new test chain which you can use to describe the expected calls, and mock their outputs.
+### affectTest Interface
+The `affectTest` method creates a new test chain which you can use to describe the expected calls, and mock their outputs.
 
-The test chain always starts with `startTest(fn).args(arg1, arg2)` and ends with `.throws(error)` or `.returns(data)`.
+The test chain always starts with `affectTest(fn).args(arg1, arg2)` and ends with `.throws(error)` or `.returns(data)`.
 In between you add as many `.awaitsCall(fn, ...args).callReturns(mockData)`, `.awaitsCall(fn, ...args).callThrows(mockError)`
 or `.awaitsAllCalls([...])` entries as needed to descibe all the methods directly called by the affect method being tested.
 
 Below is a detailed description of the test chain methods:
 
-* `startTest(fn, config)`  
+* `affectTest(fn, config)`  
   Creates a new test chain for the specified affect method `fn`.  
   Must be followed by `.args()`.
   
@@ -242,7 +242,7 @@ describe('concatFiles()', () => {
     const mockReadCalls = mockFileNames.map(filePath => (
       { fn: fs.readFile, args: [filePath], success: true, result: mockFiles[filePath] }
     ));
-    return startTest(concatFiles).args(...mockFileNames)
+    return affectTest(concatFiles).args(...mockFileNames)
       .awaitsAllCalls(mockReadCalls)
       .returns('first\nfile\nsecond\nfile\nthird');
   });
@@ -251,7 +251,7 @@ describe('concatFiles()', () => {
 
 ### Test Runners
 Affect has been written to produce nice errors in both mocha and jest. By default the assertions
-made within a `startTest` chain will use node's native `assert` methods, but if a global `expect`
+made within a `affectTest` chain will use node's native `assert` methods, but if a global `expect`
 interface is available (as provided by jest), that interface will be used.
 
 Any test runner which supports promises as reject = fail, resolve = pass should work with Affect.
@@ -418,7 +418,7 @@ You should never be putting very much information into the context. All other pr
 By default all Affect functions and tests will return whatever global `Promise` object is defined in the enviornment. For older browsers remember to include your favorite shim.
 
 ### BYO Promise
-Affect can use your favorite promise library in Affect by assigning it to `affect.Promise`. Just ensure you assign it before using `affect()` or `startTest()`.
+Affect can use your favorite promise library in Affect by assigning it to `affect.Promise`. Just ensure you assign it before using `affect()` or `affectTest()`.
 
 ```js
 const affect = require('affect');

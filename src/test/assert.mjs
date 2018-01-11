@@ -1,7 +1,8 @@
 // All internal test validations are made using assert-style calls.
 // This shim enables detailed error messages in jest/expect style test-runners.
 // This ensures that error outputs are formatted nicely in both mocha and jest.
-const assert = require('assert');
+import assert from 'assert';
+
 const usingJest = typeof expect !== 'undefined' && expect.extend && expect.anything;
 
 function runExpect(msg, chain, e) {
@@ -45,8 +46,11 @@ const fauxAssert = {
 	throws(fn, errCheck) {
 		runExpect(undefined, expect(fn).toThrow, errCheck);
 	},
-	AssertionError: assert.AssertionError
+	// TODO: move to unit test utils
+	AssertionError: assert && assert.AssertionError
 };
 
 /* istanbul ignore next */
-module.exports = usingJest ? fauxAssert : assert;
+const whichAssert = usingJest ? fauxAssert : assert;
+
+export default whichAssert;

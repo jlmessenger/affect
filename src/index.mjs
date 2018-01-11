@@ -1,0 +1,31 @@
+import { callRunners, buildCall } from './build-call.mjs';
+import configEmitter from './config-emitter.mjs';
+
+const _internal = { buildCall, configEmitter, callRunners };
+
+/**
+ * Affect's build function interface
+ * @param {Object} methods - Affect methods to convert to plain functions
+ * @param {Object} config
+ * @param {Function} config.onFunction
+ * @param {Function} config.onFunctionComplete
+ * @param {Function} config.onCall
+ * @param {Function} config.onCallComplete
+ * @param {Object} config.context
+ * @returns {Object} - Methods converted to plain functions (ie: no leading call argument)
+ */
+export default function affect(methods, config = {}) {
+	const { context = {} } = config;
+	const emitter = configEmitter(config);
+
+	const methodInit = buildCall(affect.Promise, emitter, context, callRunners);
+
+	return Object.keys(methods).reduce(
+		(copy, name) =>
+			Object.assign(copy, {
+				[name]: methodInit(methods[name])
+			}),
+		{}
+	);
+}
+Object.assign(affect, { Promise, _internal });
