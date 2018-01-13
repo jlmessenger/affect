@@ -80,7 +80,7 @@ function sendTime(call) {
 ```js
 // async/await style
 async function sendTime(call) {
-  const unixEpoch = Math.floow(call.sync(Date.now) / 1000);
+  const unixEpoch = Math.floor(call.sync(Date.now) / 1000);
   const config = JSON.parse(await call.fromCb(fs.readFile, '/path/to/config.json'));
   const response = await call.plain(fetch, `${config.url}?time=${unixEpoch}`);
   return await call.plain(response.json);
@@ -95,7 +95,7 @@ Let's expand the call interface example from before to include additional error 
 
 ```js
 async function sentTime(call) {
-  const unixEpoch = Math.floow(call.sync(Date.now) / 1000);
+  const unixEpoch = Math.floor(call.sync(Date.now) / 1000);
   try {
     const config = JSON.parse(await call.fromCb(fs.readFile, '/path/to/config.json'));
   } catch (err) {
@@ -121,42 +121,42 @@ const affectTest = require('affect/test');
 describe('sentTime()', () => {
   it('works on happy-path', () =>
     affectTest(sentTime).args()
-      .awaitsCall(Date.now)
+      .calls(Date.now)
         .callReturns(1515364390001)
-      .awaitsCall(fs.readFile, '/path/to/config.json')
+      .calls(fs.readFile, '/path/to/config.json')
         .callReturns('{"url":"http://example.com"}')
-      .awaitsCall(fetch, 'http://example.com?time=151536439')
+      .calls(fetch, 'http://example.com?time=151536439')
         .callReturns(new Response(new Blob('{"ok":true}'), {status: 200}))
-      .returns({ok: true})
+      .expectsReturn({ok: true})
   );
   it('converts error if config not found', () =>
     affectTest(sentTime).args()
-      .awaitsCall(Date.now).callReturns(1515364390001)
-      .awaitsCall(fs.readFile, '/path/to/config.json').callThrows(new Error('Not Found'))
-      .throws(new InvalidConfigError('Unable to read config file: Not Found'))
+      .calls(Date.now).callReturns(1515364390001)
+      .calls(fs.readFile, '/path/to/config.json').callThrows(new Error('Not Found'))
+      .expectsThrow(new InvalidConfigError('Unable to read config file: Not Found'))
   );
   it('converts error if config invalid JSON', () =>
     affectTest(sentTime).args()
-      .awaitsCall(Date.now).callReturns(1515364390001)
-      .awaitsCall(fs.readFile, '/path/to/config.json').callReturns('bad-json')
-      .throws(new InvalidConfigError('Unable to read config file: Unexpected token b in JSON at position 0'))
+      .calls(Date.now).callReturns(1515364390001)
+      .calls(fs.readFile, '/path/to/config.json').callReturns('bad-json')
+      .expectsThrow(new InvalidConfigError('Unable to read config file: Unexpected token b in JSON at position 0'))
   );
   it('passes thru fetch failure', () =>
     affectTest(sentTime).args()
-      .awaitsCall(Date.now).callReturns(1515364390001)
-      .awaitsCall(fs.readFile, '/path/to/config.json').callReturns('{"url":"http://example.com"}')
-      .awaitsCall(fetch, 'http://example.com?time=151536439').callThrows(new Error('passed-thru'))
-      .throws(new Error('passed-thru'))
+      .calls(Date.now).callReturns(1515364390001)
+      .calls(fs.readFile, '/path/to/config.json').callReturns('{"url":"http://example.com"}')
+      .calls(fetch, 'http://example.com?time=151536439').callThrows(new Error('passed-thru'))
+      .expectsThrow(new Error('passed-thru'))
   );
   it('fails on non 2xx responses', () =>
     affectTest(sentTime).args()
-      .awaitsCall(Date.now)
+      .calls(Date.now)
         .callReturns(1515364390001)
-      .awaitsCall(fs.readFile, '/path/to/config.json')
+      .calls(fs.readFile, '/path/to/config.json')
         .callReturns('{"url":"http://example.com"}')
-      .awaitsCall(fetch, 'http://example.com?time=151536439')
+      .calls(fetch, 'http://example.com?time=151536439')
         .callReturns(new Response(new Blob('{"ok":false}'), {status: 500}))
-      .throws(new HttpCallFailure(`HTTP Error 500`))
+      .expectsThrow(new HttpCallFailure(`HTTP Error 500`))
   );
 });
 ```
@@ -164,9 +164,9 @@ describe('sentTime()', () => {
 ### affectTest Interface
 The `affectTest` method creates a new test chain which you can use to describe the expected calls, and mock their outputs.
 
-The test chain always starts with `affectTest(fn).args(arg1, arg2)` and ends with `.throws(error)` or `.returns(data)`.
-In between you add as many `.awaitsCall(fn, ...args).callReturns(mockData)`, `.awaitsCall(fn, ...args).callThrows(mockError)`
-or `.awaitsAllCalls([...])` entries as needed to descibe all the methods directly called by the affect method being tested.
+The test chain always starts with `affectTest(fn).args(arg1, arg2)` and ends with `.expectsThrow(error)` or `.expectsReturn(data)`.
+In between you add as many `.calls(fn, ...args).callReturns(mockData)`, `.calls(fn, ...args).callThrows(mockError)`
+or `.callsAll([...])` entries as needed to descibe all the methods directly called by the affect method being tested.
 
 Below is a detailed description of the test chain methods:
 
@@ -182,34 +182,34 @@ Below is a detailed description of the test chain methods:
   * `onFunctionComplete` - event handler called after `fn` is executed
 * `.args(arg1, arg2, ...)`  
   Passes the provided arguments into the affect method being tested.  
-  Must be followed by `.awaitsCall()` or `.awaitsAllCalls()`.
-* `.awaitsCall(expectedFn, expectedArg1, expectedArg2, ...)`  
+  Must be followed by `.calls()` or `.callsAll()`.
+* `.calls(expectedFn, expectedArg1, expectedArg2, ...)`  
   Asserts that the affect method being tested calls the function `expectedFn` with the provided arguments.
   Arguments are compared with `assert.deepStrictEqual`.  
   Must be followed be either `.callReturns()` or `.callThrows()`.
 * `.callReturns(data)`  
   Defines the mock data to return/resolve for the call.  
-  Must be followed be either another `.awaitsCall()` or `.awaitsAllCalls()`
-  or the test chain can be ended with `.returns()` or `.throws()`.
+  Must be followed be either another `.calls()` or `.callsAll()`
+  or the test chain can be ended with `.expectsReturn()` or `.expectsThrow()`.
 * `.callThrows(error)`  
   Defines the mock error instance to throw/reject for the call.  
-  Must be followed be either another `.awaitsCall()` or `.awaitsAllCalls()`
-  or the test chain can be ended with `.returns()` or `.throws()`.
-* `.awaitsAllCalls(CallMocks[])`  
+  Must be followed be either another `.calls()` or `.callsAll()`
+  or the test chain can be ended with `.expectsReturn()` or `.expectsThrow()`.
+* `.callsAll(CallMocks[])`  
   Define a bulk set of calls as an array of CallMock objects. This is especially useful when the
   affect method being tested uses `Promise.all()` to execute calls in parallel.  
-  Must be followed be either another `.awaitsCall()` or `.awaitsAllCalls()`
-  or the test chain can be ended with `.returns()` or `.throws()`.
+  Must be followed be either another `.calls()` or `.callsAll()`
+  or the test chain can be ended with `.expectsReturn()` or `.expectsThrow()`.
   Each `CallMock` object must have the following properties:  
   * `fn` the expected function
   * `args` the expected arguments passed the `fn`
   * `success` boolean, set to false and mock will throw/reject the `result`
   * `result` the mock data to return or throw
-* `.returns(data)`  
+* `.expectsReturn(data)`  
   Asserts that the affect method being tested returns the specified data.  
   Data is compared using `assert.deepStrictEqual`.  
   Return a `Promise` that resolves when the test has passed, or rejects with a test failure.
-* `.throws(error)`  
+* `.expectsThrow(error)`  
   Asserts that the affect method being tested throws the specified error.
   Error instances are asserted to be the same type and have the same error message.
   Non-error objects are simply compared for deep equality.  
@@ -243,8 +243,8 @@ describe('concatFiles()', () => {
       { fn: fs.readFile, args: [filePath], success: true, result: mockFiles[filePath] }
     ));
     return affectTest(concatFiles).args(...mockFileNames)
-      .awaitsAllCalls(mockReadCalls)
-      .returns('first\nfile\nsecond\nfile\nthird');
+      .callsAll(mockReadCalls)
+      .expectsReturn('first\nfile\nsecond\nfile\nthird');
   });
 });
 ```

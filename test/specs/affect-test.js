@@ -6,25 +6,25 @@ module.exports = function({ assert, affectTest }) {
 		it('can mock inner call', () =>
 			affectTest(outer)
 				.args('zzz')
-				.awaitsCall(inner, 'zzz')
+				.calls(inner, 'zzz')
 				.callReturns('mock inner zzz1')
-				.awaitsCall(inner, 'mock inner zzz1')
+				.calls(inner, 'mock inner zzz1')
 				.callReturns('mock inner zzz2')
-				.returns('outer: mock inner zzz2'));
+				.expectsReturn('outer: mock inner zzz2'));
 		it('can mock inner call in bulk', () =>
 			affectTest(outer)
 				.args('zzz')
-				.awaitsAllCalls([
+				.callsAll([
 					{ fn: inner, args: ['zzz'], returns: 'mock inner zzz1' },
 					{ fn: inner, args: ['mock inner zzz1'], returns: 'mock inner zzz2' }
 				])
-				.returns('outer: mock inner zzz2'));
+				.expectsReturn('outer: mock inner zzz2'));
 		it('can mock errors', () =>
 			affectTest(outer)
 				.args('yyy')
-				.awaitsCall(inner, 'yyy')
+				.calls(inner, 'yyy')
 				.callThrows(new Error('broke'))
-				.throws(new Error('rethrow broke')));
+				.expectsThrow(new Error('rethrow broke')));
 		it('fail on error of incorrect type', () => {
 			function TempE(m) {
 				this.message = m;
@@ -32,9 +32,9 @@ module.exports = function({ assert, affectTest }) {
 			util.inherits(TempE, Error);
 			return affectTest(outer)
 				.args('yyy')
-				.awaitsCall(inner, 'yyy')
+				.calls(inner, 'yyy')
 				.callThrows(new Error('tempe-error'))
-				.throws(new TempE('tempe-error'))
+				.expectsThrow(new TempE('tempe-error'))
 				.catch(err => {
 					if (!/^Error must be instance of TempE/.test(err.message)) {
 						throw err;
@@ -50,18 +50,18 @@ module.exports = function({ assert, affectTest }) {
 			}
 			return affectTest(caller)
 				.args('yyy')
-				.awaitsCall(called, 'yyy')
+				.calls(called, 'yyy')
 				.callThrows('broke')
-				.throws('broke');
+				.expectsThrow('broke');
 		});
 		it('can check thrown extended error types', () => {
 			const err = new assert.AssertionError({ message: 'fail' });
 			const err2 = new assert.AssertionError({ message: 'rethrow fail' });
 			return affectTest(outer)
 				.args('yyy')
-				.awaitsCall(inner, 'yyy')
+				.calls(inner, 'yyy')
 				.callThrows(err)
-				.throws(err2);
+				.expectsThrow(err2);
 		});
 		it('emits events when configured', () => {
 			const events = [];
@@ -92,11 +92,11 @@ module.exports = function({ assert, affectTest }) {
 			};
 			return affectTest(outer, testConfig)
 				.args('xxx')
-				.awaitsCall(inner, 'xxx')
+				.calls(inner, 'xxx')
 				.callReturns('mock inner xxx')
-				.awaitsCall(inner, 'mock inner xxx')
+				.calls(inner, 'mock inner xxx')
 				.callThrows(err)
-				.throws(new Error('rethrow busted'))
+				.expectsThrow(new Error('rethrow busted'))
 				.then(delay(2)) // ensure event handers are called
 				.then(() => {
 					assert.deepStrictEqual(events, [
@@ -136,17 +136,15 @@ module.exports = function({ assert, affectTest }) {
 			try {
 				affectTest(outer)
 					.args('www')
-					.awaitsCall(inner, 'www')
+					.calls(inner, 'www')
 					.callReturns('mock inner www1')
-					.awaitsCall('whoops', 'mock inner www1')
+					.calls('whoops', 'mock inner www1')
 					.callReturns('mock inner www2')
-					.returns('outer: mock inner www2')
+					.expectsReturn('outer: mock inner www2')
 					.throw(new Error('should not run'));
 				throw new Error('should have thrown');
 			} catch (ex) {
-				if (
-					!/^\.awaitsCall\(fn, \.\.\.args\) requires first argument as function/.test(ex.message)
-				) {
+				if (!/^\.calls\(fn, \.\.\.args\) requires first argument as function/.test(ex.message)) {
 					throw ex;
 				}
 			}
@@ -154,9 +152,9 @@ module.exports = function({ assert, affectTest }) {
 		it('will throw if mock stack too short', () =>
 			affectTest(outer)
 				.args('vvv')
-				.awaitsCall(inner, 'vvv')
+				.calls(inner, 'vvv')
 				.callReturns('mock inner vvv1')
-				.returns('outer: mock inner vvv1')
+				.expectsReturn('outer: mock inner vvv1')
 				.then(r => assert.fail(r, null, 'Should have thrown'))
 				.catch(err => {
 					if (!/^#2: Unexpected call\(inner\), no more calls expected/.test(err.message)) {
@@ -166,15 +164,15 @@ module.exports = function({ assert, affectTest }) {
 		it('will throw if mock stack too long', () =>
 			affectTest(outer)
 				.args('uuu')
-				.awaitsCall(inner, 'uuu')
+				.calls(inner, 'uuu')
 				.callReturns('mock inner uuu1')
-				.awaitsCall(inner, 'mock inner uuu1')
+				.calls(inner, 'mock inner uuu1')
 				.callReturns('mock inner uuu2')
-				.awaitsCall(outer, 'mock inner uuu2')
+				.calls(outer, 'mock inner uuu2')
 				.callReturns('mock outer uuu3')
-				.awaitsCall(inner, 'mock outer uuu3')
+				.calls(inner, 'mock outer uuu3')
 				.callReturns('mock inner uuu4')
-				.returns('outer: mock inner uuu2')
+				.expectsReturn('outer: mock inner uuu2')
 				.then(r => assert.fail(r, null, 'Should have thrown'))
 				.catch(err => {
 					if (!/^Expected additional calls: outer\(\), inner\(\)/.test(err.message)) {
@@ -184,9 +182,9 @@ module.exports = function({ assert, affectTest }) {
 		it('will fail if thrown error does not match', () =>
 			affectTest(outer)
 				.args('ttt')
-				.awaitsCall(inner, 'ttt')
+				.calls(inner, 'ttt')
 				.callThrows(new Error('broke'))
-				.throws(new Error('wrong error'))
+				.expectsThrow(new Error('wrong error'))
 				.then(r => assert.fail(r, null, 'Should have thrown'))
 				.catch(err => {
 					if (
@@ -199,11 +197,11 @@ module.exports = function({ assert, affectTest }) {
 		it('will fail if thrown but return expected', () =>
 			affectTest(outer)
 				.args('sss')
-				.awaitsCall(inner, 'sss')
+				.calls(inner, 'sss')
 				.callReturns('mock inner sss1')
-				.awaitsCall(inner, 'mock inner sss1')
+				.calls(inner, 'mock inner sss1')
 				.callReturns('mock inner sss2')
-				.throws(new Error('will fail'))
+				.expectsThrow(new Error('will fail'))
 				.then(r => assert.fail(r, null, 'Should have thrown'))
 				.catch(err => {
 					if (!/Returned data, but should have thrown/.test(err.message)) {
@@ -220,9 +218,9 @@ module.exports = function({ assert, affectTest }) {
 			}
 			return affectTest(eatIt)
 				.args('rrr')
-				.awaitsCall(outer, 'rrr')
+				.calls(outer, 'rrr')
 				.callReturns('mock inner rrr1')
-				.returns('mock inner rrr1')
+				.expectsReturn('mock inner rrr1')
 				.then(r => assert.fail(r, null, 'Should have thrown'))
 				.catch(err => {
 					if (!/^#1: Unexpected call\(inner\), expected call\(outer\)/.test(err.message)) {
@@ -237,9 +235,9 @@ module.exports = function({ assert, affectTest }) {
 			}
 			return affectTest(throwIt)
 				.args('qqq')
-				.awaitsCall(inner, 'qqq')
+				.calls(inner, 'qqq')
 				.callReturns('mock inner qqq1')
-				.returns('never checked')
+				.expectsReturn('never checked')
 				.then(r => assert.fail(r, null, 'Should have thrown'))
 				.catch(err => {
 					if (!/^throw-it/.test(err.message)) {
@@ -256,9 +254,9 @@ module.exports = function({ assert, affectTest }) {
 			}
 			return affectTest(callsPi)
 				.args()
-				.awaitsCall(pi, 159)
+				.calls(pi, 159)
 				.callReturns('pi')
-				.returns('pi');
+				.expectsReturn('pi');
 		});
 		it('can test calls to callback methods', () => {
 			function someAction(a, cb) {
@@ -272,11 +270,11 @@ module.exports = function({ assert, affectTest }) {
 			}
 			return affectTest(usesCallback)
 				.args()
-				.awaitsCall(someAction, 'callback')
+				.calls(someAction, 'callback')
 				.callReturns('mock callback')
-				.awaitsCall(someAction, 'callback2')
+				.calls(someAction, 'callback2')
 				.callReturns(['mock callback2'])
-				.returns(['mock callback', ['mock callback2']]);
+				.expectsReturn(['mock callback', ['mock callback2']]);
 		});
 		it('can get errors from callback methods', () => {
 			function someAction(a, cb) {
@@ -290,11 +288,11 @@ module.exports = function({ assert, affectTest }) {
 			}
 			return affectTest(usesCallback)
 				.args()
-				.awaitsCall(someAction, 'callback')
+				.calls(someAction, 'callback')
 				.callThrows(new Error('1st error'))
-				.awaitsCall(someAction, 'callback2')
+				.calls(someAction, 'callback2')
 				.callThrows(new Error('2nd error'))
-				.returns(['1st error', '2nd error']);
+				.expectsReturn(['1st error', '2nd error']);
 		});
 		it('can test calls to sync functions', () => {
 			function pi(x) {
@@ -306,55 +304,55 @@ module.exports = function({ assert, affectTest }) {
 			}
 			return affectTest(callsPi)
 				.args()
-				.awaitsCall(pi, 159)
+				.calls(pi, 159)
 				.callReturns(['fake', 'value'])
-				.returns('value');
+				.expectsReturn('value');
 		});
-		it('can resolve Promise.all methods with .awaitsAllCalls()', () => {
+		it('can resolve Promise.all methods with .callsAll()', () => {
 			const callGroup = [
 				{ fn: inner, args: ['a'], returns: '(inner a)' },
 				{ fn: inner, args: ['b'], returns: '(inner b)' }
 			];
 			return affectTest(callsEach)
 				.args()
-				.awaitsCall(inner, '_')
+				.calls(inner, '_')
 				.callReturns('(inner _)')
-				.awaitsAllCalls(callGroup)
-				.returns(['static', '(inner a)', '(inner b)']);
+				.callsAll(callGroup)
+				.expectsReturn(['static', '(inner a)', '(inner b)']);
 		});
-		it('can reject Promise.all methods with .awaitsAllCalls()', () => {
+		it('can reject Promise.all methods with .callsAll()', () => {
 			const callGroup = [
 				{ fn: inner, args: ['a'], returns: null },
 				{ fn: inner, args: ['b'], throws: new Error('fail') }
 			];
 			return affectTest(callsEach)
 				.args()
-				.awaitsCall(inner, '_')
+				.calls(inner, '_')
 				.callReturns('(inner _)')
-				.awaitsAllCalls(callGroup)
-				.throws(new Error('fail'));
+				.callsAll(callGroup)
+				.expectsThrow(new Error('fail'));
 		});
-		it('will handle non-array args in .awaitsAllCalls()', () => {
+		it('will handle non-array args in .callsAll()', () => {
 			const callGroup = [
 				{ fn: inner, args: 'a', returns: '(inner a)' },
 				{ fn: inner, args: 'b', returns: '(inner b)' }
 			];
 			return affectTest(callsEach)
 				.args()
-				.awaitsCall(inner, '_')
+				.calls(inner, '_')
 				.callReturns('(inner _)')
-				.awaitsAllCalls(callGroup)
-				.returns(['static', '(inner a)', '(inner b)']);
+				.callsAll(callGroup)
+				.expectsReturn(['static', '(inner a)', '(inner b)']);
 		});
-		it('will handle zero args calls in .awaitsAllCalls()', () => {
+		it('will handle zero args calls in .callsAll()', () => {
 			function callInner(call) {
 				return call(inner);
 			}
 			const callGroup = [{ fn: inner, returns: '(inner undefined)' }];
 			return affectTest(callInner)
 				.args()
-				.awaitsAllCalls(callGroup)
-				.returns('(inner undefined)');
+				.callsAll(callGroup)
+				.expectsReturn('(inner undefined)');
 		});
 	});
 };

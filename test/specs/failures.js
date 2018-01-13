@@ -9,12 +9,12 @@ function methodBeingTested(call) {
 
 module.exports = function({ assert, affectTest }) {
 	describe('affectTest failures', () => {
-		it('fail on .awaitsCall() wrong arguments', () =>
+		it('fail on .calls() wrong arguments', () =>
 			affectTest(methodBeingTested)
 				.args('a', 'b')
-				.awaitsCall(methodCalled, 'wrong') // <- fail
+				.calls(methodCalled, 'wrong') // <- fail
 				.callReturns('mock')
-				.returns('mock')
+				.expectsReturn('mock')
 				.then(r => assert.fail(r, null, 'Should have thrown'))
 				.catch(err => {
 					if (!/#1: Unexpected arguments for methodCalled\(\)/.test(err.message)) {
@@ -26,9 +26,9 @@ module.exports = function({ assert, affectTest }) {
 				() =>
 					affectTest(methodBeingTested)
 						.args('a', 'b')
-						.awaitsCall(methodCalled, 'ok') // <-- fail
-						.returns('mock'),
-				/\.returns\(data\) can only come after \.callReturns\(\) or \.callThrows\(\)/
+						.calls(methodCalled, 'ok') // <-- fail
+						.expectsReturn('mock'),
+				/\.expectsReturn\(data\) can only come after \.callReturns\(\) or \.callThrows\(\)/
 			);
 		});
 		it('fail on missing fail on double .callReturns/.callThrows', () => {
@@ -36,65 +36,65 @@ module.exports = function({ assert, affectTest }) {
 				() =>
 					affectTest(methodBeingTested)
 						.args('a', 'b')
-						.awaitsCall(methodCalled, 'ok')
+						.calls(methodCalled, 'ok')
 						.callThrows(new Error('error'))
 						.callReturns('mock') // <-- fail
-						.returns('mock'),
-				/\.callReturns\(data\) can only come after \.awaitsCall\(\)/
+						.expectsReturn('mock'),
+				/\.callReturns\(data\) can only come after \.calls\(\)/
 			);
 		});
-		it('fail on missing fail on double .awaitsCall', () => {
+		it('fail on missing fail on double .calls', () => {
 			assert.throws(
 				() =>
 					affectTest(methodBeingTested)
 						.args('a', 'b')
-						.awaitsCall(methodCalled, 'ok')
-						.awaitsCall(methodCalled, 'ok') // <-- fail
+						.calls(methodCalled, 'ok')
+						.calls(methodCalled, 'ok') // <-- fail
 						.callReturns('mock')
-						.returns('mock'),
-				/\.awaitsCall\(fn, \.\.\.args\) can only come after \.callReturns\(\) or \.callThrows\(\)/
+						.expectsReturn('mock'),
+				/\.calls\(fn, \.\.\.args\) can only come after \.callReturns\(\) or \.callThrows\(\)/
 			);
 		});
-		it('fail on missing fail on double .awaitsAllCalls', () => {
+		it('fail on missing fail on double .callsAll', () => {
 			assert.throws(
 				() =>
 					affectTest(methodBeingTested)
 						.args('a', 'b')
-						.awaitsCall(methodCalled, 'ok')
-						.awaitsAllCalls([{ fn: methodCalled, args: ['ok'], returns: 'mock' }]) // <-- fail
-						.returns('mock'),
-				/\.awaitsAllCalls\(\[\{fn, args, returns\/throws\}, \.\.\.\]\) can only come after \.callReturns\(\) or \.callThrows\(\)/
+						.calls(methodCalled, 'ok')
+						.callsAll([{ fn: methodCalled, args: ['ok'], returns: 'mock' }]) // <-- fail
+						.expectsReturn('mock'),
+				/\.callsAll\(\[\{fn, args, returns\/throws\}, \.\.\.\]\) can only come after \.callReturns\(\) or \.callThrows\(\)/
 			);
 		});
-		it('fail on missing .args before .awaitsCall', () => {
+		it('fail on missing .args before .calls', () => {
 			assert.throws(
 				() =>
 					affectTest(methodBeingTested)
-						.awaitsCall(methodCalled, 'ok') // <-- fail
+						.calls(methodCalled, 'ok') // <-- fail
 						.callThrows('mock')
-						.returns('mock'),
-				/\.args\(\.\.\.args\) must be called before \.awaitsCall\(\)/
+						.expectsReturn('mock'),
+				/\.args\(\.\.\.args\) must be called before \.calls\(\)/
 			);
 		});
-		it('fail on missing .args before .awaitsAllCalls', () => {
+		it('fail on missing .args before .callsAll', () => {
 			assert.throws(
 				() =>
 					affectTest(methodBeingTested)
-						.awaitsAllCalls(methodCalled, 'ok') // <-- fail
+						.callsAll(methodCalled, 'ok') // <-- fail
 						.callThrows('mock')
-						.returns('mock'),
-				/\.args\(\.\.\.args\) must be called before \.awaitsAllCalls\(\)/
+						.expectsReturn('mock'),
+				/\.args\(\.\.\.args\) must be called before \.callsAll\(\)/
 			);
 		});
-		it('fail on .awaitsCall missing function', () => {
+		it('fail on .calls missing function', () => {
 			assert.throws(
 				() =>
 					affectTest(methodBeingTested)
 						.args('a', 'b')
-						.awaitsCall('a') // <- fail
+						.calls('a') // <- fail
 						.callReturns('mock')
-						.returns('mock'),
-				/\.awaitsCall\(fn, \.\.\.args\) requires first argument as function/
+						.expectsReturn('mock'),
+				/\.calls\(fn, \.\.\.args\) requires first argument as function/
 			);
 		});
 		it('fail on .affectTest not a function', () => {
@@ -102,40 +102,40 @@ module.exports = function({ assert, affectTest }) {
 				() =>
 					affectTest(0) // <-- fail
 						.args('a', 'b')
-						.awaitsCall(methodCalled, 'ok')
+						.calls(methodCalled, 'ok')
 						.callReturns('mock')
-						.returns('mock'),
-				/startTest\(fn\) requires a function argument/
+						.expectsReturn('mock'),
+				/affectTest\(fn\) requires a function argument/
 			);
 		});
-		it('fail on .awaitsAllCalls not array', () => {
+		it('fail on .callsAll not array', () => {
 			assert.throws(
 				() =>
 					affectTest(methodBeingTested)
 						.args('a', 'b')
-						.awaitsAllCalls('bad') // <-- fail
-						.returns('mock'),
-				/\.awaitsAllCalls\(\[\{fn, args, returns\/throws}, \.\.\.\]\) requires non-empty array argument/
+						.callsAll('bad') // <-- fail
+						.expectsReturn('mock'),
+				/\.callsAll\(\[\{fn, args, returns\/throws}, \.\.\.\]\) requires non-empty array argument/
 			);
 		});
-		it('fail on .awaitsAllCalls {fn: } is not a function', () => {
+		it('fail on .callsAll {fn: } is not a function', () => {
 			assert.throws(
 				() =>
 					affectTest(methodBeingTested)
 						.args('a', 'b')
-						.awaitsAllCalls([{ fn: 'x', returns: 'mock' }]) // <-- fail
-						.returns('mock'),
-				/\.awaitsAllCalls\(\[\{fn, args, returns\/throws\}, \.\.\.\]\) requires argument\[0\]\.fn as a function/
+						.callsAll([{ fn: 'x', returns: 'mock' }]) // <-- fail
+						.expectsReturn('mock'),
+				/\.callsAll\(\[\{fn, args, returns\/throws\}, \.\.\.\]\) requires argument\[0\]\.fn as a function/
 			);
 		});
-		it('fail on .awaitsAllCalls missing returns or throws', () => {
+		it('fail on .callsAll missing returns or throws', () => {
 			assert.throws(
 				() =>
 					affectTest(methodBeingTested)
 						.args('a', 'b')
-						.awaitsAllCalls([{ fn: methodCalled, args: ['ok'] }]) // <-- fail
-						.returns('mock'),
-				/\.awaitsAllCalls\(\[\{fn, args, returns\/throws\}, \.\.\.\]\) requires argument\[0\] must have property \{returns: data\} or \{throws: error\}/
+						.callsAll([{ fn: methodCalled, args: ['ok'] }]) // <-- fail
+						.expectsReturn('mock'),
+				/\.callsAll\(\[\{fn, args, returns\/throws\}, \.\.\.\]\) requires argument\[0\] must have property \{returns: data\} or \{throws: error\}/
 			);
 		});
 	});

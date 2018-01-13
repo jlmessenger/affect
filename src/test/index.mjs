@@ -108,7 +108,7 @@ class MockStack {
  * @param {Object} testConfig.context
  */
 export default function affectTest(testFn, testConfig = {}) {
-	assert.strictEqual(typeof testFn, 'function', 'startTest(fn) requires a function argument');
+	assert.strictEqual(typeof testFn, 'function', 'affectTest(fn) requires a function argument');
 	const { context = {} } = testConfig;
 	const emitter = configEmitter(testConfig);
 
@@ -206,56 +206,48 @@ export default function affectTest(testFn, testConfig = {}) {
 
 	let endCall;
 	const forCall = {
-		awaitsCall(fn, ...args) {
+		calls(fn, ...args) {
 			assert.strictEqual(
 				typeof fn,
 				'function',
-				'.awaitsCall(fn, ...args) requires first argument as function'
+				'.calls(fn, ...args) requires first argument as function'
 			);
 			stack.append(fn, args);
 			return endCall;
 		},
-		awaitsAllCalls(arrayFnArgsOutcome) {
+		callsAll(arrayFnArgsOutcome) {
 			assert.ok(
 				Array.isArray(arrayFnArgsOutcome) && arrayFnArgsOutcome.length,
-				'.awaitsAllCalls([{fn, args, returns/throws}, ...]) requires non-empty array argument'
+				'.callsAll([{fn, args, returns/throws}, ...]) requires non-empty array argument'
 			);
 			arrayFnArgsOutcome.forEach((entry, i) => {
 				assert.strictEqual(
 					typeof entry.fn,
 					'function',
-					`.awaitsAllCalls([{fn, args, returns/throws}, ...]) requires argument[${i}].fn as a function`
+					`.callsAll([{fn, args, returns/throws}, ...]) requires argument[${i}].fn as a function`
 				);
 				assert.ok(
 					entry.hasOwnProperty('returns') || entry.hasOwnProperty('throws'),
-					`.awaitsAllCalls([{fn, args, returns/throws}, ...]) requires argument[${i}] must have property {returns: data} or {throws: error}`
+					`.callsAll([{fn, args, returns/throws}, ...]) requires argument[${i}] must have property {returns: data} or {throws: error}`
 				);
 			});
 			stack.appendAll(arrayFnArgsOutcome);
 			return forCall;
 		},
-		returns(result) {
+		expectsReturn(result) {
 			Object.assign(stack.tail, { success: true, result });
 			return runTest();
 		},
-		throws(result) {
+		expectsThrow(result) {
 			Object.assign(stack.tail, { success: false, result });
 			return runTest();
 		},
 		callReturns() {
-			assert.fail(
-				'.callReturns()',
-				'.awaitsCall()',
-				'.callReturns(data) can only come after .awaitsCall()'
-			);
+			assert.fail('.callReturns()', '.calls()', '.callReturns(data) can only come after .calls()');
 		},
 		callThrows() {
 			/* istanbul ignore next */
-			assert.fail(
-				'.callThrows()',
-				'.awaitsCall()',
-				'.callThrows(error) can only come after .awaitsCall()'
-			);
+			assert.fail('.callThrows()', '.calls()', '.callThrows(error) can only come after .calls()');
 		}
 	};
 	endCall = {
@@ -267,33 +259,33 @@ export default function affectTest(testFn, testConfig = {}) {
 			Object.assign(stack.head, { success: false, result });
 			return forCall;
 		},
-		awaitsCall() {
+		calls() {
 			assert.fail(
-				'.awaitsCall()',
+				'.calls()',
 				'.callReturns()|.callThrows()',
-				'.awaitsCall(fn, ...args) can only come after .callReturns() or .callThrows()'
+				'.calls(fn, ...args) can only come after .callReturns() or .callThrows()'
 			);
 		},
-		awaitsAllCalls() {
+		callsAll() {
 			assert.fail(
-				'.awaitsAllCalls()',
+				'.callsAll()',
 				'.callReturns()|.callThrows()',
-				'.awaitsAllCalls([{fn, args, returns/throws}, ...]) can only come after .callReturns() or .callThrows()'
+				'.callsAll([{fn, args, returns/throws}, ...]) can only come after .callReturns() or .callThrows()'
 			);
 		},
-		returns() {
+		expectsReturn() {
 			assert.fail(
-				'.returns()',
+				'.expectsReturn()',
 				'.callReturns()|.callThrows()',
-				'.returns(data) can only come after .callReturns() or .callThrows()'
+				'.expectsReturn(data) can only come after .callReturns() or .callThrows()'
 			);
 		},
-		throws() {
+		expectsThrow() {
 			/* istanbul ignore next */
 			assert.fail(
-				'.throws()',
+				'.expectsThrow()',
 				'.callReturns()|.callThrows()',
-				'.throws(error) can only come after .callReturns() or .callThrows()'
+				'.expectsReturn(error) can only come after .callReturns() or .callThrows()'
 			);
 		}
 	};
@@ -302,15 +294,11 @@ export default function affectTest(testFn, testConfig = {}) {
 			stack.append(testFn, args);
 			return forCall;
 		},
-		awaitsCall() {
-			assert.fail('.awaitsCall()', '.args()', '.args(...args) must be called before .awaitsCall()');
+		calls() {
+			assert.fail('.call()', '.args()', '.args(...args) must be called before .calls()');
 		},
-		awaitsAllCalls() {
-			assert.fail(
-				'.awaitsAllCalls()',
-				'.args()',
-				'.args(...args) must be called before .awaitsAllCalls()'
-			);
+		callsAll() {
+			assert.fail('.callsAll()', '.args()', '.args(...args) must be called before .callsAll()');
 		}
 	};
 	return init;
