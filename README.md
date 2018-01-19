@@ -27,8 +27,8 @@ npm install --save affect
 Writing an affect method is the same as writing any normal Javascript promise/async function,
 except the first argument will always be `call`.
 
-Then within the method, any methods with loads state or causes side-effects should not be called
-directly, but rather called using passed-in `call` interface.
+Then within the method, any methods which loads state or causes side-effects should not be called
+directly, but rather called using the passed-in `call` interface.
 
 #### Affect Method Example
 ```js
@@ -110,7 +110,7 @@ async function sentTime(call) {
 ```
 
 Normally getting full unit-test coverage on this function would require many mocks, often provided by a tool like Sinon.
-With Affect unit tests are as simple as describing each intended call with arguments and the final method outcome.
+With Affect, unit tests are as simple as describing each intended call with arguments and the final method outcome.
 
 #### Unit Test Example
 
@@ -173,7 +173,7 @@ Below is a detailed description of the test chain methods:
 * `affectTest(fn, config)`  
   Creates a new test chain for the specified affect method `fn`.  
   Must be followed by `.args()`.
-  
+
   `config` is an optional object with the following properties:  
   * `context` - context object
   * `onFunction` - event handler called when before `fn` is executed
@@ -347,8 +347,8 @@ onFunctionComplete: sendTime Completed (398ms)
 The `affect` config object allows an optional `context` property to be provided.
 This object can be read within event handlers and within affect methods using `call.context`.
 
-Additionaly each function built by `affect` has an additional property `.withContext()`.
-Calling the function using `.withContext(context, ...args)` will merge invokation specific context with the original config values.
+Additionally, each function built by `affect` has a property `.withContext()`.
+Calling the function using `.withContext(context, ...args)` will merge the invocation specific context with the original config values.
 
 #### Context example
 ```js
@@ -375,7 +375,7 @@ While all your code is simple to unit test, you may want to use runtime validati
 end-to-end tests using actual code paths. Using the context object allows you to include additional
 side-channel information for this purpose.
 
-#### Selectivly disable logging example
+#### Selectively disable logging example
 In the example below, calling `functions.sendTime()` would be logged, but `functions.sendTime.withContext({ logging: false })` would not be logged.
 
 ```js
@@ -415,7 +415,7 @@ async function saveUser(call, userData) {
 You should never be putting very much information into the context. All other program state and configuration should be read directly using unit testable functions and the `call` interfaces. Context is intended only for special cases of testing within a runtime, and should NEVER be used as a way to inject general application config or state data.
 
 ## Notes on Promises
-By default all Affect functions and tests will return whatever global `Promise` object is defined in the enviornment. For older browsers remember to include your favorite shim.
+By default all Affect functions and tests will return whatever global `Promise` object is defined in the environment. For older browsers remember to include your favorite shim.
 
 ### BYO Promise
 Affect can use your favorite promise library in Affect by assigning it to `affect.Promise`. Just ensure you assign it before using `affect()` or `affectTest()`.
