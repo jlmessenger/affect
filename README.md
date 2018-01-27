@@ -42,7 +42,8 @@ function getUser(call, userId) {
       return rows[0];
     });
 }
-
+```
+```js
 // Async/Await style
 async function getUser(call, userId) {
   const rows = await call.async(queryDatabase, `SELECT * FROM users WHERE userId = ${userId}`);
@@ -173,7 +174,7 @@ Below is a detailed description of the test chain methods:
 * `affectTest(fn, config)`  
   Creates a new test chain for the specified affect method `fn`.  
   Must be followed by `.args()`.
-
+  
   `config` is an optional object with the following properties:  
   * `context` - context object
   * `onFunction` - event handler called when before `fn` is executed
