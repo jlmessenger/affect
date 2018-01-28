@@ -16,12 +16,15 @@ npm install --save affect
  * [Writing Affect Methods](#writing-affect-methods)
  * [Call Interfaces](#call-interfaces)
  * [Simple Unit Testing](#simple-unit-testing)
-   * [affectTest Interface](#affectTest-interface)
+   * [affectTest Interface](#affecttest-interface)
+   * [Promise.all Unit Test](#promiseall-unit-test-example)
+   * [Controlled Execution Tests](#controlled-execution-tests)
  * [Using Affect Methods](#using-affect-methods)
    * [affect Interface](#affect-interface)
    * [Getting Telemetry](#getting-telemetry)
    * [Using Context](#using-context)
  * [Notes on Promises](#notes-on-promises)
+   * [BYO Promise](#byo-promise)
 
 ## Writing Affect Methods
 Writing an affect method is the same as writing any normal Javascript promise/async function,
@@ -66,7 +69,7 @@ async function getUser(call, userId) {
 This example demonstrates a variety of the `call` interfaces in a single affect method.
 
 The method is designed to make an HTTP GET request to a uri stored in a JSON config file
-and include the current unix epoch as a querystring param.
+and include the current unix epoch as a query string param.
 
 ```js
 // Promise style
@@ -167,7 +170,7 @@ The `affectTest` method creates a new test chain which you can use to describe t
 
 The test chain always starts with `affectTest(fn).args(arg1, arg2)` and ends with `.expectsThrow(error)` or `.expectsReturn(data)`.
 In between you add as many `.calls(fn, ...args).callReturns(mockData)`, `.calls(fn, ...args).callThrows(mockError)`
-or `.callsAll([...])` entries as needed to descibe all the methods directly called by the affect method being tested.
+or `.callsAll([...])` entries as needed to describe all the methods directly called by the affect method being tested.
 
 Below is a detailed description of the test chain methods:
 
@@ -187,6 +190,9 @@ Below is a detailed description of the test chain methods:
 * `.calls(expectedFn, expectedArg1, expectedArg2, ...)`  
   Asserts that the affect method being tested calls the function `expectedFn` with the provided arguments.
   Arguments are compared with `assert.deepStrictEqual`.  
+  If any arguments are dynamic functions, like `call(doX, x => x + 1)`, then in there is no way to
+  directly assert them. In that case use: `.calls(doX, Function)` and it will only assert that the argument
+  is a function.  
   Must be followed be either `.callReturns()` or `.callThrows()`.
 * `.callReturns(data)`  
   Defines the mock data to return/resolve for the call.  
@@ -196,6 +202,10 @@ Below is a detailed description of the test chain methods:
   Defines the mock error instance to throw/reject for the call.  
   Must be followed be either another `.calls()` or `.callsAll()`
   or the test chain can be ended with `.expectsReturn()` or `.expectsThrow()`.
+* `.callExecute()`  
+  Instructs the test to execute this call.  
+  If the call makes calls of it's own, those calls will need to be specified in the test chain.
+  See the section on [controlled execution](#controlled-execution-tests) for additional examples.
 * `.callsAll(CallMocks[])`  
   Define a bulk set of calls as an array of CallMock objects. This is especially useful when the
   affect method being tested uses `Promise.all()` to execute calls in parallel.  
@@ -228,6 +238,7 @@ function concatFiles(call, ...filePaths) {
     .then(allFiles => allFiles.join('\n'));
 }
 ```
+
 ```js
 // Unit test example
 describe('concatFiles()', () => {
@@ -249,6 +260,135 @@ describe('concatFiles()', () => {
   });
 });
 ```
+
+#### Controlled Execution Tests
+There are cases where rather than provide mock data for a unit test call, you want to execute the function.
+This can be done using `.calls(action, arg1).callExecute()`. However, because the call is executed, any calls
+that it makes will also need to be included in the test chain.
+
+```js
+// Example of database changes run within a transaction
+function commit(call, tx) {
+  return tx.call();
+}
+function rollback(call, tx) {
+  return tx.rollback();
+}
+
+async function inTransaction(call, fnUsesTx) {
+  const tx = await call(beginTransaction);
+  try {
+    const result = await fnUsesTx(tx);
+    await call(commit, tx);
+    return result;
+  } catch (ex) {
+    await call(rollback, tx);
+    throw ex;
+  }
+}
+
+async function updateMany(call, ids, values) {
+  return await call(inTransaction, tx => {
+    const updates = ids.map(id => call(updateItem, id, values, tx));
+    return Promise.all(updates);
+  });
+}
+```
+
+In the above example, we want to ensure the transaction callback function is run during the test chain.
+This can be accomplished using controlled execution as show below.
+
+```js
+const affectTest = require('affect/test');
+describe('updateMany()', () => {
+  it('will commit all updates', () => {
+    const mockTx = { mock: true };
+    const values = { fieldName: 'value' };
+    return affectTest(updateMany)
+      .args([1, 2], values)
+      .calls(inTransaction, Function).callExecute()
+      .calls(beginTransaction).callReturns(mockTx)
+      .calls(updateItem, 1, values, mockTx).callReturns({ id: 1 })
+      .calls(updateItem, 2, values, mockTx).callReturns({ id: 2 })
+      .calls(commit, mockTx).callReturns()
+      .expectsReturn([{ id: 1 }, { id: 2 }]);
+  });
+  it('will rollback on failure', () => {
+    const mockTx = { mock: true };
+    const values = { fieldName: 'other' };
+    return affectTest(updateMany)
+      .args([3, 4], values)
+      .calls(inTransaction, Function).callExecute()
+      .calls(beginTransaction).callReturns(mockTx)
+      .calls(updateItem, 3, values, mockTx).callReturns({ id: 1 })
+      .calls(updateItem, 4, values, mockTx).callThrows(new Error('Mock DB Error'))
+      .calls(rollback, mockTx).callReturns()
+      .expectsThrow(new Error('Mock DB Error'));
+  });
+});
+```
+
+As demonstrated in the above unit test examples, the dynamic function argument passed to `inTransaction`
+is represented with placeholder `Function`. Then the `.callExecute()` command tells the test runner
+that `inTransaction` should actually be run. The immediate `.calls` after the execution represent
+the calls made from within the `inTransaction` method.
+
+Finally after `inTransaction` begins the transaction, it runs the passed in function, which in turn
+calls `updateItem`. After the updates are completed the `inTransaction` method calls commit.
+
+**Other Benefits**  
+In addition to running dynamic functions, controlled execution can also be useful to observe
+full function execution, while asserting the specific call order and arguments made during execution.
+
+**Alternative**  
+The disadvantage of using controlled execution, is that you must repeat the sub-call logic in each test,
+which means future refactoring will require changes to every test.
+
+An alternative pattern that avoids dynamic functions may be preferred for this reason.
+
+```js
+async function inTransaction(call, subCalls) {
+  const tx = call(beginTransaction);
+  try {
+    const runs = subCalls.map(({ fn, args = [] }) => call(fn, ...args.concat(tx)));
+    return result = await Promise.all(runs);
+    await call(commit, tx);
+    return result;
+  } catch (ex) {
+    await call(rollback, tx);
+    throw ex;
+  }
+}
+function updateMany(call, ids, values) {
+  const subCalls = ids.map(id => ({ fn: updateItem, args: [id, values] }));
+  return call(inTransaction, subCalls);
+}
+```
+
+In this version, rather than providing an dynamic function for `inTransaction` to run, the
+function accepts an array of `{ fn, args: [] }` objects. Because the list of calls to run
+are described as data, rather than an opaque dynamic function the unit tests will not require
+controlled execution.
+
+```js
+const affectTest = require('affect/test');
+describe('updateMany()', () => {
+  it('will commit all updates', () => {
+    const values = { fieldName: 'value' };
+    return affectTest(updateMany)
+      .args([1, 2], values)
+      .calls(inTransaction, [
+        { fn: updateItem, args: [1, values] },
+        { fn: updateItem, args: [2, values] }
+      ]).callReturns([{ id: 1 }, { id: 2 }])
+      .expectsReturn([{ id: 1 }, { id: 2 }]);
+  });
+});
+```
+
+It is recommended that you avoid controlled execution when possible by describing execution
+as arguments, rather than defining dynamic functions. Doing so will simplify unit tests and
+avoid repetitive tests which may break during refactoring.
 
 ### Test Runners
 Affect has been written to produce nice errors in both mocha and jest. By default the assertions
@@ -284,6 +424,35 @@ You can now simply use each function without worrying about `call` argument. Exa
 * `functions.getUser(userId)`
 * `functions.concatFiles(...filePaths)`
 * `functions.sendTime()`
+
+You can also organize your functions into namespaces using nested objects.
+
+```js
+const affect = require('affect');
+const getUser = require('./methods/get-user');
+const concatFiles = require('./methods/concat-files');
+const sendTime = require('./methods/send-time');
+const functions = affect({
+  user: {
+    get: getUser
+  },
+  io: {
+    files: {
+      concat: concatFiles
+    },
+    http: {
+      sendTime
+    }
+  }
+});
+module.exports = functions;
+```
+
+In this version the functions would be available using:
+
+* `functions.user.get(userId)`
+* `functions.io.files.concat(...filePaths)`
+* `functions.io.http.sendTime()`
 
 ### Getting Telemetry
 The `affect` function accepts an optional `config` object as it's second argument. You can specify the following event handers:

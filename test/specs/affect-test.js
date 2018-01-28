@@ -25,6 +25,22 @@ module.exports = function({ assert, affectTest }) {
 				.calls(inner, 'yyy')
 				.callThrows(new Error('broke'))
 				.expectsThrow(new Error('rethrow broke')));
+		it('can execute subcalls', () =>
+			affectTest(outer)
+				.args('run')
+				.calls(inner, 'run')
+				.callExecute()
+				.calls(inner, '(inner run)')
+				.callExecute()
+				.expectsReturn('outer: (inner (inner run))'));
+		it('can execute subcalls in bulk', () =>
+			affectTest(outer)
+				.args('bulk')
+				.callsAll([
+					{ fn: inner, args: ['bulk'], execute: true },
+					{ fn: inner, args: ['(inner bulk)'], execute: true }
+				])
+				.expectsReturn('outer: (inner (inner bulk))'));
 		it('fail on error of incorrect type', () => {
 			function TempE(m) {
 				this.message = m;
@@ -148,6 +164,39 @@ module.exports = function({ assert, affectTest }) {
 					throw ex;
 				}
 			}
+		});
+		it('allows generated call Function arguments', () => {
+			function wrapHandler(call, arg, handlerFn) {
+				return handlerFn(arg);
+			}
+			function main(call) {
+				return call(wrapHandler, 'a', a => {
+					return 'b';
+				});
+			}
+			return affectTest(main)
+				.args()
+				.calls(wrapHandler, 'a', Function)
+				.callReturns('x')
+				.expectsReturn('x');
+		});
+		it('will throw if Function argument is not a function', () => {
+			function wrapHandler(call, arg, handlerFn) {
+				return handlerFn(arg);
+			}
+			function main(call) {
+				return call(wrapHandler, 'a', 'b');
+			}
+			return affectTest(main)
+				.args()
+				.calls(wrapHandler, 'a', Function)
+				.callReturns('x')
+				.expectsReturn('x')
+				.catch(err => {
+					if (!/^#1: Unexpected arguments for wrapHandler\(\)/.test(err.message)) {
+						throw err;
+					}
+				});
 		});
 		it('will throw if mock stack too short', () =>
 			affectTest(outer)

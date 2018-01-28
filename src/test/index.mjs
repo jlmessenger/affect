@@ -41,7 +41,10 @@ const whichMock = {
 const mockRunners = Object.keys(callRunners).reduce((forMock, name) => {
 	const realRunner = callRunners[name];
 	forMock[name] = (opts, fn, ...args) => {
-		const mockArgs = opts.context.verify(fn, args);
+		const { execute, mockArgs } = opts.context.verify(fn, args);
+		if (execute === true) {
+			return realRunner(opts, fn, ...args);
+		}
 		return realRunner(opts, whichMock[name], ...mockArgs);
 	};
 	return forMock;
@@ -62,27 +65,28 @@ class MockStack {
 	get length() {
 		return this.stack.length;
 	}
-	append(expectFn, expectArgs, n = false, success = null, result = null) {
+	append(expectFn, expectArgs, n = false, success = null, result = null, execute = false) {
 		let number = n;
 		if (!n) {
 			number = `#${this.number}`;
 			this.number += 1;
 		}
-		this.stack.push({ number, expectFn, expectArgs, success, result });
+		const fnArgIdxs = expectArgs.map((arg, i) => i).filter(i => expectArgs[i] === Function);
+		this.stack.push({ number, expectFn, expectArgs, success, result, fnArgIdxs, execute });
 	}
 	appendAll(arrayFnArgsOutcome) {
 		arrayFnArgsOutcome.forEach((entry, i) => {
-			const success = entry.hasOwnProperty('returns');
+			const execute = entry.execute || false;
 			const args = !entry.hasOwnProperty('args')
 				? []
 				: Array.isArray(entry.args) ? entry.args : [entry.args];
-			this.append(
-				entry.fn,
-				args,
-				`${this.number}[${i}]`,
-				success,
-				success ? entry.returns : entry.throws
-			);
+			const number = `${this.number}[${i}]`;
+			if (execute) {
+				this.append(entry.fn, args, number, null, null, true);
+			} else {
+				const success = entry.hasOwnProperty('returns');
+				this.append(entry.fn, args, number, success, success ? entry.returns : entry.throws);
+			}
 		});
 		this.number += 1;
 	}
@@ -133,18 +137,25 @@ export default function affectTest(testFn, testConfig = {}) {
 						'>'
 					);
 				}
-				const { all, expectFn, expectArgs, success, result } = frame;
+				const { all, expectFn, expectArgs, success, result, fnArgIdxs, execute } = frame;
 				assert.strictEqual(
 					callFn,
 					expectFn,
 					`${number}: Unexpected call(${callFn.name}), expected call(${expectFn.name})`
 				);
+				const callArgsGeneric = fnArgIdxs.length ? callArgs.slice() : callArgs;
+				fnArgIdxs.forEach(i => {
+					if (typeof callArgs[i] === 'function') {
+						callArgsGeneric[i] = Function;
+					}
+				});
 				assert.deepStrictEqual(
-					callArgs,
+					callArgsGeneric,
 					expectArgs,
 					`${number}: Unexpected arguments for ${callFn.name}()`
 				);
-				return [callFn.name, { success, result }];
+				const mockArgs = [callFn.name, { success, result }];
+				return { execute, mockArgs };
 			} catch (ex) {
 				// prevent internal method error handling from accessing real error
 				testRunError = ex;
@@ -227,8 +238,10 @@ export default function affectTest(testFn, testConfig = {}) {
 					`.callsAll([{fn, args, returns/throws}, ...]) requires argument[${i}].fn as a function`
 				);
 				assert.ok(
-					entry.hasOwnProperty('returns') || entry.hasOwnProperty('throws'),
-					`.callsAll([{fn, args, returns/throws}, ...]) requires argument[${i}] must have property {returns: data} or {throws: error}`
+					entry.execute === true ||
+						entry.hasOwnProperty('returns') ||
+						entry.hasOwnProperty('throws'),
+					`.callsAll([{fn, args, returns/throws/execute}, ...]) requires argument[${i}] must have property: {returns: data}, {throws: error} or {execute: true}`
 				);
 			});
 			stack.appendAll(arrayFnArgsOutcome);
@@ -248,6 +261,10 @@ export default function affectTest(testFn, testConfig = {}) {
 		callThrows() {
 			/* istanbul ignore next */
 			assert.fail('.callThrows()', '.calls()', '.callThrows(error) can only come after .calls()');
+		},
+		callExecute() {
+			/* istanbul ignore next */
+			assert.fail('.callExecute()', '.calls()', '.callExecute() can only come after .calls()');
 		}
 	};
 	endCall = {
@@ -257,6 +274,10 @@ export default function affectTest(testFn, testConfig = {}) {
 		},
 		callThrows(result) {
 			Object.assign(stack.head, { success: false, result });
+			return forCall;
+		},
+		callExecute() {
+			Object.assign(stack.head, { execute: true });
 			return forCall;
 		},
 		calls() {

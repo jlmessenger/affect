@@ -8,6 +8,28 @@ module.exports = function({ assert, affect }) {
 				.outer('aaa')
 				.then(out => assert.strictEqual(out, 'outer: (inner (inner aaa))'));
 		});
+		it('applies nested functions in namespace', () => {
+			const ns = {
+				root: outer,
+				nested: {
+					inner,
+					literal: true,
+					array: [1, 2]
+				}
+			};
+			const functions = affect(ns);
+			assert.strictEqual(typeof functions.root, 'function');
+			assert.strictEqual(typeof functions.nested, 'object');
+			assert.strictEqual(typeof functions.nested.inner, 'function');
+			assert.strictEqual(functions.nested.literal, true);
+			assert.deepStrictEqual(functions.nested.array, [1, 2]);
+			return Promise.all([functions.root('aaa'), functions.nested.inner('bbb')]).then(
+				([root, inner]) => {
+					assert.strictEqual(root, 'outer: (inner (inner aaa))');
+					assert.strictEqual(inner, '(inner bbb)');
+				}
+			);
+		});
 		it('emits events when configured', () => {
 			const events = [];
 			const functions = affect(

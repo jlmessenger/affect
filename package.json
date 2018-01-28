@@ -1,6 +1,6 @@
 {
   "name": "affect",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Affect is a micro abstraction layer for Javascript that simplifies unit testing and monitoring side-effects",
   "main": "index.js",
   "module": "dist/affect.es.js",

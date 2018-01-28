@@ -135,7 +135,7 @@ module.exports = function({ assert, affectTest }) {
 						.args('a', 'b')
 						.callsAll([{ fn: methodCalled, args: ['ok'] }]) // <-- fail
 						.expectsReturn('mock'),
-				/\.callsAll\(\[\{fn, args, returns\/throws\}, \.\.\.\]\) requires argument\[0\] must have property \{returns: data\} or \{throws: error\}/
+				/\.callsAll\(\[\{fn, args, returns\/throws\/execute\}, \.\.\.\]\) requires argument\[0\] must have property: \{returns: data\}, \{throws: error\} or \{execute: true\}/
 			);
 		});
 	});
