@@ -113,6 +113,19 @@ module.exports = function({ assert, affectTest }) {
 				.calls(inner, 'mock inner xxx')
 				.callThrows(err)
 				.expectsThrow(new Error('rethrow busted'))
+				.then(() => {
+					function MyClass() {}
+					MyClass.prototype.doIt = function() {};
+					const instance = new MyClass();
+					function callBound(call) {
+						return call.bound(instance, 'doIt');
+					}
+					return affectTest(callBound, testConfig)
+						.args()
+						.calls(instance, 'doIt')
+						.callReturns(true)
+						.expectsReturn(true);
+				})
 				.then(delay(2)) // ensure event handers are called
 				.then(() => {
 					assert.deepStrictEqual(events, [
@@ -144,6 +157,24 @@ module.exports = function({ assert, affectTest }) {
 							fnName: 'outer',
 							args: ['xxx'],
 							success: false
+						},
+						{ event: 'onFunction', fnName: 'callBound', args: [] },
+						{
+							event: 'onCall',
+							fnName: 'bound mockCallPlain',
+							args: ['<MyClass>.doIt', { result: true, success: true }]
+						},
+						{
+							event: 'onCallComplete',
+							fnName: 'bound mockCallPlain',
+							args: ['<MyClass>.doIt', { result: true, success: true }],
+							success: true
+						},
+						{
+							event: 'onFunctionComplete',
+							fnName: 'callBound',
+							args: [],
+							success: true
 						}
 					]);
 				});
@@ -356,6 +387,65 @@ module.exports = function({ assert, affectTest }) {
 				.calls(pi, 159)
 				.callReturns(['fake', 'value'])
 				.expectsReturn('value');
+		});
+		it('can test calls to bound functions', () => {
+			const instance = {
+				property: 'got it',
+				method: function method(x) {
+					return `${this.property} ${x}`;
+				}
+			};
+			function callsBound(call) {
+				return call.bound(instance, 'method', 'here');
+			}
+			return affectTest(callsBound)
+				.args()
+				.calls(instance, 'method', 'here')
+				.callReturns('fake string')
+				.expectsReturn('fake string');
+		});
+		it('will reject calls to wrong bound instace', () => {
+			const instance = {
+				property: 'got it',
+				method: function method(x) {
+					return `${this.property} ${x}`;
+				}
+			};
+			const otherInstance = Object.assign({}, instance);
+			function callsBound(call) {
+				return call.bound(instance, 'method', 'here');
+			}
+			return affectTest(callsBound)
+				.args()
+				.calls(otherInstance, 'method', 'here')
+				.callReturns('fake string')
+				.expectsReturn('fake string')
+				.catch(err => {
+					if (
+						!/^#1: Unexpected call\(<Object>, 'method'\), expected same boundTo object/.test(
+							err.message
+						)
+					) {
+						throw err;
+					}
+				});
+		});
+		it('will reject bound method names which do not exist', () => {
+			function MyClass() {}
+			const instance = new MyClass();
+			function callBound(call) {
+				return call.bound(instance, 'doIt');
+			}
+			return affectTest(callBound)
+				.args()
+				.calls(instance, 'doIt')
+				.callReturns(true)
+				.expectsReturn(true)
+				.catch(err => {
+					if (!/^#1: Cannot make bound call, <MyClass>\.doIt is not a function/.test(err.message)) {
+						throw err;
+					}
+				});
 		});
 		it('can resolve Promise.all methods with .callsAll()', () => {
 			const callGroup = [

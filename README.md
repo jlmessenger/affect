@@ -63,6 +63,7 @@ async function getUser(call, userId) {
 * `call.sync(fn, ...args) : result` - Call a synchronous Javascript function.
 * `call.fromCb(fn, ...args) : Promise(result)` - Call a function which uses a node-style callback(err, result).
 * `call.multiCb(fn, ...args) : Promise([...results])` - Call a function which uses a node-style callback(err, result1, result2).
+* `call.bound(instance, 'methodName', ...args) : Promise(result)` - Call a method on the specified instance.
 * `call.context : Object` - Reference to the context object
 
 #### Call Interface Example

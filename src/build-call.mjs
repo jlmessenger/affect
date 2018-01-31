@@ -137,6 +137,10 @@ export const callRunners = {
 	},
 	multiCb(opts, fn, ...args) {
 		return runCallback(opts, true, fn, args);
+	},
+	bound(opts, boundTo, methodName, ...args) {
+		const boundFn = boundTo[methodName].bind(boundTo);
+		return runPromise(opts, callEvents, args, boundFn, args);
 	}
 };
 
@@ -149,6 +153,7 @@ export const callRunners = {
  * @param {Function} runners.fromCb
  * @param {Function} runners.multiCb
  * @param {Function} runners.context
+ * @param {Function} runners.bound
  * @param {Object} opts
  * @param {Object} promise - Promise constructor
  * @param {EventEmitter} emitter
@@ -161,6 +166,7 @@ function createCallInterface(runners, opts) {
 	call.sync = runners.sync.bind(null, opts);
 	call.fromCb = runners.fromCb.bind(null, opts);
 	call.multiCb = runners.multiCb.bind(null, opts);
+	call.bound = runners.bound.bind(null, opts);
 	call.context = opts.context;
 	return call;
 }

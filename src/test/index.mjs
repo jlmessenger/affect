@@ -34,18 +34,30 @@ const whichMock = {
 	plain: mockCallPlain,
 	sync: mockCallSync,
 	fromCb: mockCallFromCb,
-	multiCb: mockCallMultiCb
+	multiCb: mockCallMultiCb,
+	bound: mockCallPlain
 };
+
+function getInstanceName(obj) {
+	const type = (obj.constructor && obj.constructor.name) || 'Object';
+	return `<${type}>`;
+}
 
 // Build mock runners for each call.<method>() interface
 const mockRunners = Object.keys(callRunners).reduce((forMock, name) => {
 	const realRunner = callRunners[name];
 	forMock[name] = (opts, fn, ...args) => {
-		const { execute, mockArgs } = opts.context.verify(fn, args);
+		const { execute, outcome } = opts.context.verify(fn, args);
 		if (execute === true) {
 			return realRunner(opts, fn, ...args);
 		}
-		return realRunner(opts, whichMock[name], ...mockArgs);
+		if (typeof fn === 'object') {
+			const methodName = args[0];
+			const instance = { [methodName]: whichMock[name] };
+			const fnName = `${getInstanceName(fn)}.${args[0]}`;
+			return realRunner(opts, instance, methodName, fnName, outcome);
+		}
+		return realRunner(opts, whichMock[name], fn.name, outcome);
 	};
 	return forMock;
 }, {});
@@ -138,11 +150,25 @@ export default function affectTest(testFn, testConfig = {}) {
 					);
 				}
 				const { all, expectFn, expectArgs, success, result, fnArgIdxs, execute } = frame;
+				const isBound = typeof callFn === 'object';
 				assert.strictEqual(
 					callFn,
 					expectFn,
-					`${number}: Unexpected call(${callFn.name}), expected call(${expectFn.name})`
+					isBound
+						? `${number}: Unexpected call(${getInstanceName(callFn)}, '${
+								callArgs[0]
+							}'), expected same boundTo object`
+						: `${number}: Unexpected call(${callFn.name}), expected call(${expectFn.name})`
 				);
+				if (isBound) {
+					assert.strictEqual(
+						typeof callFn[callArgs[0]],
+						'function',
+						`${number}: Cannot make bound call, ${getInstanceName(callFn)}.${
+							callArgs[0]
+						} is not a function`
+					);
+				}
 				const callArgsGeneric = fnArgIdxs.length ? callArgs.slice() : callArgs;
 				fnArgIdxs.forEach(i => {
 					if (typeof callArgs[i] === 'function') {
@@ -154,8 +180,10 @@ export default function affectTest(testFn, testConfig = {}) {
 					expectArgs,
 					`${number}: Unexpected arguments for ${callFn.name}()`
 				);
-				const mockArgs = [callFn.name, { success, result }];
-				return { execute, mockArgs };
+				return {
+					execute,
+					outcome: { success, result }
+				};
 			} catch (ex) {
 				// prevent internal method error handling from accessing real error
 				testRunError = ex;
@@ -218,11 +246,20 @@ export default function affectTest(testFn, testConfig = {}) {
 	let endCall;
 	const forCall = {
 		calls(fn, ...args) {
-			assert.strictEqual(
-				typeof fn,
-				'function',
-				'.calls(fn, ...args) requires first argument as function'
-			);
+			const fnType = typeof fn;
+			if (fnType === 'object') {
+				assert.strictEqual(
+					typeof args[0],
+					'string',
+					'.calls(boundTo, methodName, ...args) requires second argument as string'
+				);
+			} else {
+				assert.strictEqual(
+					fnType,
+					'function',
+					'.calls(fn, ...args) requires first argument as function'
+				);
+			}
 			stack.append(fn, args);
 			return endCall;
 		},

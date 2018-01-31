@@ -139,6 +139,19 @@ module.exports = function({ assert, affect }) {
 					}
 				});
 		});
+		it('can call instance methods', () => {
+			const instance = {
+				property: 'got it',
+				method: function method(x) {
+					return `${this.property} ${x}`;
+				}
+			};
+			function usesBound(call) {
+				return call.bound(instance, 'method', 'ok');
+			}
+			const functions = affect({ usesBound });
+			return functions.usesBound().then(out => assert.strictEqual(out, 'got it ok'));
+		});
 		it('call read context', () => {
 			function usesContext(call) {
 				return call.context.value + call.context.unchanged;
