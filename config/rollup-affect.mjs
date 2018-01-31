@@ -20,5 +20,19 @@ export default [
 				file: 'dist/affect.es.js'
 			}
 		]
+	},
+	{
+		input: 'src/index.mjs',
+		external: ['events'],
+		plugins: [],
+		output: [
+			{
+				name: 'affect',
+				format: 'es',
+				interop: false,
+				sourcemap: true,
+				file: 'dist/affect.esnext.js'
+			}
+		]
 	}
 ];
