@@ -5,7 +5,7 @@ Affect is a micro abstraction layer for Javascript that simplifies unit testing 
 * Easy to learn - pure functional Javascript
 * Enable fast and painless unit testing
 * Simple interop with existing code and patterns
-* Lightweight and low-impact
+* Lightweight and low-impact, only ~1.2K minfied and gzipped
 
 #### Setup
 ```sh
@@ -269,21 +269,14 @@ that it makes will also need to be included in the test chain.
 
 ```js
 // Example of database changes run within a transaction
-function commit(call, tx) {
-  return tx.call();
-}
-function rollback(call, tx) {
-  return tx.rollback();
-}
-
 async function inTransaction(call, fnUsesTx) {
   const tx = await call(beginTransaction);
   try {
     const result = await fnUsesTx(tx);
-    await call(commit, tx);
+    await call.bound(tx, 'commit');
     return result;
   } catch (ex) {
-    await call(rollback, tx);
+    await call.bound(tx, 'rollback');
     throw ex;
   }
 }
@@ -303,7 +296,7 @@ This can be accomplished using controlled execution as show below.
 const affectTest = require('affect/test');
 describe('updateMany()', () => {
   it('will commit all updates', () => {
-    const mockTx = { mock: true };
+    const mockTx = { rollback() {}, commit() {} };
     const values = { fieldName: 'value' };
     return affectTest(updateMany)
       .args([1, 2], values)
@@ -311,11 +304,11 @@ describe('updateMany()', () => {
       .calls(beginTransaction).callReturns(mockTx)
       .calls(updateItem, 1, values, mockTx).callReturns({ id: 1 })
       .calls(updateItem, 2, values, mockTx).callReturns({ id: 2 })
-      .calls(commit, mockTx).callReturns()
+      .calls(mockTx, 'commit').callReturns()
       .expectsReturn([{ id: 1 }, { id: 2 }]);
   });
   it('will rollback on failure', () => {
-    const mockTx = { mock: true };
+    const mockTx = { rollback() {}, commit() {} };
     const values = { fieldName: 'other' };
     return affectTest(updateMany)
       .args([3, 4], values)
@@ -323,7 +316,7 @@ describe('updateMany()', () => {
       .calls(beginTransaction).callReturns(mockTx)
       .calls(updateItem, 3, values, mockTx).callReturns({ id: 1 })
       .calls(updateItem, 4, values, mockTx).callThrows(new Error('Mock DB Error'))
-      .calls(rollback, mockTx).callReturns()
+      .calls(mockTx, 'rollback').callReturns()
       .expectsThrow(new Error('Mock DB Error'));
   });
 });
@@ -353,10 +346,10 @@ async function inTransaction(call, subCalls) {
   try {
     const runs = subCalls.map(({ fn, args = [] }) => call(fn, ...args.concat(tx)));
     return result = await Promise.all(runs);
-    await call(commit, tx);
+    await call.bound(tx, 'commit');
     return result;
   } catch (ex) {
-    await call(rollback, tx);
+    await call.bound(tx, 'rollback');
     throw ex;
   }
 }
