@@ -1,0 +1,48 @@
+{
+  "name": "affect",
+  "version": "2.0.0-rc2",
+  "description": "Affect is a micro abstraction layer for Javascript that simplifies unit testing and monitoring side-effects",
+  "main": "affect.js",
+  "config": {
+    "prettier": "**/*.{js,json}",
+    "test": "**/*.test.js"
+  },
+  "scripts": {
+    "fmt": "prettier --write \"$npm_package_config_prettier\"",
+    "mocha": "mocha \"$npm_package_config_test\"",
+    "test": "nyc mocha \"$npm_package_config_test\""
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "babel-plugin-istanbul": "^4.1.5",
+    "babel-register": "^6.26.0",
+    "mocha": "^5.0.0",
+    "nyc": "^11.4.1",
+    "prettier": "^1.10.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/jlmessenger/affect.git"
+  },
+  "keywords": [
+    "affect",
+    "async",
+    "unit",
+    "test",
+    "promise",
+    "monitoring"
+  ],
+  "author": "jlmessenger <jlmessenger@users.noreply.github.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jlmessenger/affect/issues"
+  },
+  "homepage": "https://github.com/jlmessenger/affect#readme",
+  "files": [
+    "affect.js",
+    "test.js",
+    "package.json",
+    "README.md",
+    "use.test.js"
+  ]
+}

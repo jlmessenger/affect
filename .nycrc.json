@@ -1,0 +1,8 @@
+{
+	"sourceMap": false,
+	"instrument": false,
+	"reporter": ["text", "text-summary", "html"],
+	"require": ["babel-register"],
+	"include": ["**/*.js"],
+	"exclude": ["**/*.test.js"]
+}
